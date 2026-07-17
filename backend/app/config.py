@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "Local Agent"
     ANTHROPIC_URL: str
     API_KEY: str
-    ANTHROPIC_MODEL: str = "deepseek-v4-flash"
+    ANTHROPIC_MODEL: str
     SYSTEM_PROMPT_PATH: Path | None = None
 
     model_config = SettingsConfigDict(env_file=_ENV_FILE, env_file_encoding="utf-8")
