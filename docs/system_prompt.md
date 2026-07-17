@@ -1,3 +1,7 @@
+# 目前所在目录
+
+目前所在目录是 `D:/projects/agent/backend`
+
 # 公式输出的要求
 
 在需要写数学公式时，必须使用 Markdown 数学定界符：

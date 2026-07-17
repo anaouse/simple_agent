@@ -2,3 +2,5 @@ node_modules
 .idle
 .env
 .venv
+log
+__pycache__
