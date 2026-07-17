@@ -1,0 +1,22 @@
+.home-page {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  background: var(--gray-0);
+  border-inline: 1px solid var(--gray-200);
+}
+
+.home-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.home-page__header span {
+  color: var(--gray-500);
+  font-size: 13px;
+}

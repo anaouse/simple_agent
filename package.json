@@ -23,10 +23,13 @@
   "dependencies": {
     "@streamdown/code": "^1.1.1",
     "@streamdown/math": "^1.0.2",
+    "@tailwindcss/vite": "^4.3.3",
     "axios": "^1.18.1",
     "katex": "^0.17.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "streamdown": "^2.5.0"
+    "shiki": "^4.3.1",
+    "streamdown": "^2.5.0",
+    "tailwindcss": "^4.3.3"
   }
 }

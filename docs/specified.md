@@ -2,7 +2,7 @@
 
 这是一个本地极简ai agent的前后端项目，本文档为项目统一约定，会随着项目的发展加入更多约定，没有特殊理由请严格遵守，如需打破约定请先在此文档中更新说明。
 
-开发的时候我使用热重载开发，所以不用编译验证，有错误的话我会告诉你的
+开发的时候我使用热重载开发，所以不用编译验证，有错误的话我会告诉你的，尽可能只使用文件编辑工具即可，然后查找什么的使用grep，find的bash命令
 
 ---
 
@@ -24,7 +24,7 @@ SETTINGS = get_settings()
 print(SETTINGS.APP_NAME)
 ```
 - 关键节点必须打日志：收到用户消息、调用上游 API 开始/结束、工具调用开始/结束、异常。用 `loguru`
-- 与上游模型 API（Anthropic/OpenAI 等）的交互全部封装在 `services/` 层，路由函数和 WebSocket handler 里不允许直接出现上游 SDK 调用
+- 放到app/文件夹当中，引用使用绝对路径引用，比如（from app.ai.anthropic_adaptor import AnthropicAdaptor）
 
 ---
 
@@ -39,7 +39,8 @@ print(SETTINGS.APP_NAME)
 - 所有组件和page的css放到css文件夹下，命名和组件名称一样，但是形态变化，例子为：input-box.css， home-page.css
 - @/root.css 放置本项目的颜色变量，所有css都需要使用root.css当中的颜色变量作为颜色，如果真的需要添加颜色也请加入到 root.css当中再调用
 - 所有css都在 `main.tsx` 当中引入，不要在组件内部或者page当中引入
- 
+- 页面放到 pages 文件夹当中
+
 ---
 
 ## 实时通信设计（WebSocket）
@@ -61,7 +62,7 @@ print(SETTINGS.APP_NAME)
 2. 收敛复杂度：上游事件结构对前端没有意义的细节（如 content_block 索引、上游内部 id）不应该暴露给前端
 3. 业务逻辑集中：落库、计费、多个 delta 聚合成完整消息，这些都在后端的 adapter 层统一处理
 
-即使现在只对接一个上游 API，也要写这层 adapter（`services/stream_adapter.py`），方便未来扩展。
+即使现在只对接一个上游 API，也要写这层 adapter，方便未来扩展。
 
 ---
 

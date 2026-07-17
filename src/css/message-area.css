@@ -1,0 +1,11 @@
+.message-area {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.message-area__empty {
+  margin-top: 30vh;
+  color: var(--gray-400);
+  text-align: center;
+}

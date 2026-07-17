@@ -1,3 +1,5 @@
+import HomePage from '@/pages/HomePage'
+
 export default function App() {
-  return <h1>Hello from agent</h1>
+  return <HomePage />
 }
