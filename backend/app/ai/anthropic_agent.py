@@ -1,14 +1,41 @@
 import asyncio
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Literal, TypedDict
 
 from anthropic import AsyncAnthropic
 from loguru import logger
 
 from app.config import Settings
-from app.tools.tool_utils import tools_from_functions
 from app.tools import edit, read, walk, write
+from app.tools.tool_utils import tools_from_functions
+
+
+class ContentDelta(TypedDict):
+    type: Literal["content_delta"]
+    delta: str
+
+
+class ToolCallStart(TypedDict):
+    type: Literal["tool_call_start"]
+    tool_call_id: str
+    tool_name: str
+    arguments: dict[str, object]
+
+
+class ToolCallResult(TypedDict):
+    type: Literal["tool_call_result"]
+    tool_call_id: str
+    result: str
+    is_error: bool
+
+
+class InternalToolResultEvent(TypedDict):
+    type: Literal["tool_result_internal"]
+    message: dict[str, object]
+
+
+AgentEvent = ContentDelta | ToolCallStart | ToolCallResult
 
 
 class AnthropicAgent:
@@ -24,7 +51,7 @@ class AnthropicAgent:
             [read, write, edit, walk]
         )
 
-    async def reply(self, user_content: str) -> AsyncIterator[str]:
+    async def reply(self, user_content: str) -> AsyncIterator["AgentEvent"]:
         self._messages.append({"role": "user", "content": user_content})
 
         try:
@@ -44,7 +71,7 @@ class AnthropicAgent:
                         if event.type != "content_block_delta":
                             continue
                         if event.delta.type == "text_delta":
-                            yield event.delta.text
+                            yield {"type": "content_delta", "delta": event.delta.text}
                     final_message = await stream.get_final_message()
 
                 logger.info("Upstream API call completed")
@@ -54,15 +81,18 @@ class AnthropicAgent:
                 if final_message.stop_reason != "tool_use":
                     break
 
-                tool_result_message = await self._execute_tools(assistant_message)
-                self._messages.append(tool_result_message)
+                async for tool_event in self._execute_tools(assistant_message):
+                    if tool_event["type"] == "tool_result_internal":
+                        self._messages.append(tool_event["message"])
+                    else:
+                        yield tool_event
         except Exception:
             logger.exception("Agent reply failed")
             raise
 
     async def _execute_tools(
         self, assistant_message: dict[str, object]
-    ) -> dict[str, object]:
+    ) -> AsyncIterator["AgentEvent | InternalToolResultEvent"]:
         result_blocks: list[dict[str, object]] = []
         content = assistant_message.get("content", [])
         if not isinstance(content, list):
@@ -77,6 +107,13 @@ class AnthropicAgent:
             tool_input = block.get("input", {})
             function = self._tool_functions.get(tool_name)
             logger.info("Tool call started: {}", tool_name)
+            arguments = tool_input if isinstance(tool_input, dict) else {}
+            yield {
+                "type": "tool_call_start",
+                "tool_call_id": tool_use_id,
+                "tool_name": tool_name,
+                "arguments": arguments,
+            }
 
             is_error = False
             if function is None:
@@ -90,12 +127,19 @@ class AnthropicAgent:
                     result = await asyncio.to_thread(
                         self._call_tool, function, tool_input
                     )
+                    is_error = self._is_tool_error(str(result))
                 except Exception as exception:
                     logger.exception("Tool call failed: {}", tool_name)
                     result = f"Error executing tool '{tool_name}': {exception}"
                     is_error = True
 
             logger.info("Tool call completed: {}", tool_name)
+            yield {
+                "type": "tool_call_result",
+                "tool_call_id": tool_use_id,
+                "result": str(result),
+                "is_error": is_error,
+            }
             result_blocks.append(
                 {
                     "type": "tool_result",
@@ -105,7 +149,29 @@ class AnthropicAgent:
                 }
             )
 
-        return {"role": "user", "content": result_blocks}
+        yield {
+            "type": "tool_result_internal",
+            "message": {"role": "user", "content": result_blocks},
+        }
+
+    @staticmethod
+    def _is_tool_error(result: str) -> bool:
+        """Detect the error strings returned by local tools."""
+        error_prefixes = (
+            "Access denied",
+            "Path does not exist",
+            "Path is not",
+            "Path exists but",
+            "Path is outside",
+            "Failed to",
+            "No match found",
+            "old_text",
+            "All old_text",
+            "Error:",
+        )
+        if result.startswith(error_prefixes):
+            return True
+        return any(f"\n{prefix}" in result for prefix in error_prefixes)
 
     @staticmethod
     def _call_tool(

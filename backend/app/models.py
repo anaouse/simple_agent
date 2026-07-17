@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 
 class ApiModel(BaseModel):
@@ -29,6 +29,22 @@ class ContentDeltaEvent(ApiModel):
 class MessageEndEvent(ApiModel):
     type: Literal["message_end"] = "message_end"
     message_id: str
+
+
+class ToolCallStartEvent(ApiModel):
+    type: Literal["tool_call_start"] = "tool_call_start"
+    message_id: str
+    tool_call_id: str
+    tool_name: str
+    arguments: dict[str, JsonValue]
+
+
+class ToolCallResultEvent(ApiModel):
+    type: Literal["tool_call_result"] = "tool_call_result"
+    message_id: str
+    tool_call_id: str
+    result: str
+    is_error: bool = False
 
 
 class ErrorBody(ApiModel):

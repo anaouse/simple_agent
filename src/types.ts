@@ -1,13 +1,27 @@
-export type MessageRole = 'user' | 'assistant'
+export type MessageRole = 'user' | 'assistant' | 'tool'
 export type MessageStatus = 'complete' | 'streaming' | 'error'
 
-export interface ChatMessage {
+interface BaseChatMessage {
   id: string
-  role: MessageRole
-  content: string
   status: MessageStatus
   createdAt: string
 }
+
+export interface TextChatMessage extends BaseChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+  parentMessageId?: string
+}
+
+export interface ToolChatMessage extends BaseChatMessage {
+  role: 'tool'
+  parentMessageId: string
+  toolName: string
+  arguments: Record<string, unknown>
+  result: string
+}
+
+export type ChatMessage = TextChatMessage | ToolChatMessage
 
 export interface ClientMessage {
   type: 'message'
@@ -26,6 +40,22 @@ export interface ContentDeltaEvent {
   delta: string
 }
 
+export interface ToolCallStartEvent {
+  type: 'tool_call_start'
+  messageId: string
+  toolCallId: string
+  toolName: string
+  arguments: Record<string, unknown>
+}
+
+export interface ToolCallResultEvent {
+  type: 'tool_call_result'
+  messageId: string
+  toolCallId: string
+  result: string
+  isError: boolean
+}
+
 export interface MessageEndEvent {
   type: 'message_end'
   messageId: string
@@ -41,4 +71,10 @@ export interface ErrorEvent {
   error: ErrorBody
 }
 
-export type ServerEvent = MessageStartEvent | ContentDeltaEvent | MessageEndEvent | ErrorEvent
+export type ServerEvent =
+  | MessageStartEvent
+  | ContentDeltaEvent
+  | ToolCallStartEvent
+  | ToolCallResultEvent
+  | MessageEndEvent
+  | ErrorEvent

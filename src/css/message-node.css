@@ -10,6 +10,11 @@
   background: var(--gray-50);
 }
 
+.message-node--tool {
+  border-color: var(--gray-300);
+  background: var(--gray-100);
+}
+
 .message-node__header {
   display: flex;
   width: 100%;
@@ -45,4 +50,40 @@
 .message-node__error {
   color: var(--red-500);
   font-size: 13px;
+}
+
+.message-node__tool-details {
+  display: grid;
+  gap: 12px;
+}
+
+.message-node__tool-details section {
+  min-width: 0;
+}
+
+.message-node__tool-details strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--gray-600);
+  font-size: 13px;
+}
+
+.message-node__tool-details pre {
+  max-height: 420px;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  background: var(--gray-0);
+  color: var(--gray-700);
+  font: 13px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.message-node__tool-details .message-node__tool-result--error {
+  border-color: var(--red-200);
+  background: var(--red-50);
+  color: var(--red-600);
 }

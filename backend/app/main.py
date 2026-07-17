@@ -18,6 +18,8 @@ from app.models import (
     ErrorResponse,
     MessageEndEvent,
     MessageStartEvent,
+    ToolCallResultEvent,
+    ToolCallStartEvent,
 )
 
 SETTINGS = get_settings()
@@ -75,11 +77,34 @@ async def chat(websocket: WebSocket) -> None:
             )
 
             try:
-                async for delta in agent.reply(message.content):
-                    await send_event(
-                        websocket,
-                        ContentDeltaEvent(message_id=message_id, delta=delta),
-                    )
+                async for event in agent.reply(message.content):
+                    if event["type"] == "content_delta":
+                        await send_event(
+                            websocket,
+                            ContentDeltaEvent(
+                                message_id=message_id, delta=event["delta"]
+                            ),
+                        )
+                    elif event["type"] == "tool_call_start":
+                        await send_event(
+                            websocket,
+                            ToolCallStartEvent(
+                                message_id=message_id,
+                                tool_call_id=event["tool_call_id"],
+                                tool_name=event["tool_name"],
+                                arguments=event["arguments"],
+                            ),
+                        )
+                    else:
+                        await send_event(
+                            websocket,
+                            ToolCallResultEvent(
+                                message_id=message_id,
+                                tool_call_id=event["tool_call_id"],
+                                result=event["result"],
+                                is_error=event["is_error"],
+                            ),
+                        )
                 await send_event(websocket, MessageEndEvent(message_id=message_id))
             except Exception:
                 await send_event(
