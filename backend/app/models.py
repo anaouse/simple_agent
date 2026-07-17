@@ -10,8 +10,16 @@ class ApiModel(BaseModel):
 
 
 class ClientMessage(ApiModel):
-    type: Literal["message"]
+    type: Literal["message", "project_switch"]
     content: str = Field(min_length=1, max_length=100_000)
+
+
+class ProjectRequest(ApiModel):
+    path: str = Field(min_length=1, max_length=4096)
+
+
+class ProjectResponse(ApiModel):
+    path: str
 
 
 class MessageStartEvent(ApiModel):

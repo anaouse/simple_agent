@@ -1,4 +1,3 @@
-import asyncio
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Callable, Literal, TypedDict
@@ -8,6 +7,7 @@ from loguru import logger
 
 from app.config import Settings
 from app.tools import edit, read, walk, write
+from app.tools.security import set_project_root
 from app.tools.tool_utils import tools_from_functions
 
 
@@ -39,19 +39,23 @@ AgentEvent = ContentDelta | ToolCallStart | ToolCallResult
 
 
 class AnthropicAgent:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, project_path: Path) -> None:
         self._settings = settings
+        self._project_path = project_path.resolve()
+        set_project_root(self._project_path)
         self._client = AsyncAnthropic(
             api_key=settings.API_KEY,
             base_url=settings.ANTHROPIC_URL,
         )
         self._messages: list[dict[str, object]] = []
-        self._system_prompt = self._read_system_prompt(settings.SYSTEM_PROMPT_PATH)
+        base_prompt = self._read_system_prompt(settings.SYSTEM_PROMPT_PATH)
+        self._system_prompt = self._build_system_prompt(base_prompt)
         self._tools, self._tool_functions = tools_from_functions(
             [read, write, edit, walk]
         )
 
     async def reply(self, user_content: str) -> AsyncIterator["AgentEvent"]:
+        set_project_root(self._project_path)
         self._messages.append({"role": "user", "content": user_content})
 
         try:
@@ -124,9 +128,7 @@ class AnthropicAgent:
                 is_error = True
             else:
                 try:
-                    result = await asyncio.to_thread(
-                        self._call_tool, function, tool_input
-                    )
+                    result = self._call_tool(function, tool_input)
                     is_error = self._is_tool_error(str(result))
                 except Exception as exception:
                     logger.exception("Tool call failed: {}", tool_name)
@@ -173,11 +175,11 @@ class AnthropicAgent:
             return True
         return any(f"\n{prefix}" in result for prefix in error_prefixes)
 
-    @staticmethod
     def _call_tool(
-        function: Callable[..., str], tool_input: dict[str, object]
+        self, function: Callable[..., str], tool_input: dict[str, object]
     ) -> str:
-        """Invoke a synchronous tool function."""
+        """Invoke a synchronous tool function in the active project context."""
+        set_project_root(self._project_path)
         return function(**tool_input)
 
     @staticmethod
@@ -208,6 +210,23 @@ class AnthropicAgent:
 
     async def close(self) -> None:
         await self._client.close()
+
+    def _build_system_prompt(self, base_prompt: str | None) -> str:
+        """Add the active project path to the configured system prompt."""
+        project_section = (
+            "# 目前所在目录\n\n"
+            f"目前所在目录是 `{self._project_path.as_posix()}`，所有文件工具只能访问该目录及其子目录。"
+        )
+        if not base_prompt:
+            return project_section
+        lines = base_prompt.splitlines()
+        if lines and lines[0].strip() == "# 目前所在目录":
+            next_heading = next(
+                (index for index, line in enumerate(lines[1:], start=1) if line.startswith("# ")),
+                len(lines),
+            )
+            base_prompt = "\n".join(lines[next_heading:]).strip()
+        return f"{project_section}\n\n{base_prompt}" if base_prompt else project_section
 
     @staticmethod
     def _read_system_prompt(path: Path | None) -> str | None:

@@ -1,11 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
 import InputBox from '@/components/InputBox'
 import MessageArea from '@/components/MessageArea'
-import type { ChatMessage, ClientMessage, ServerEvent } from '@/types'
+import ProjectSidebar from '@/components/ProjectSidebar'
+import type { ChatMessage, ClientMessage, Project, ServerEvent } from '@/types'
 
-const WS_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:2453/ws/chat`
+const WS_BASE_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:2453/ws/chat`
+const PROJECTS_STORAGE_KEY = 'agent-projects'
+
+function loadProjects(): Project[] {
+  try {
+    const stored = JSON.parse(localStorage.getItem(PROJECTS_STORAGE_KEY) ?? '[]')
+    if (!Array.isArray(stored)) return []
+    return stored.filter((project): project is Project => (
+      typeof project === 'object' && project !== null && typeof project.path === 'string'
+    ))
+  } catch {
+    return []
+  }
+}
 
 export default function HomePage() {
+  const [projects, setProjects] = useState<Project[]>(loadProjects)
+  const [activePath, setActivePath] = useState<string | null>(null)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [connected, setConnected] = useState(false)
   const [waiting, setWaiting] = useState(false)
@@ -14,17 +31,57 @@ export default function HomePage() {
   const messageCreatedAtRef = useRef(new Map<string, string>())
 
   useEffect(() => {
-    const socket = new WebSocket(WS_URL)
+    localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects))
+  }, [projects])
+
+  useEffect(() => {
+    return () => {
+      socketRef.current?.close()
+    }
+  }, [])
+
+  function connect(path: string, switched: boolean) {
+    socketRef.current?.close()
+    setConnected(false)
+    setWaiting(false)
+    const socket = new WebSocket(`${WS_BASE_URL}?project_path=${encodeURIComponent(path)}`)
     socketRef.current = socket
-    socket.onopen = () => setConnected(true)
+    socket.onopen = () => {
+      if (socketRef.current !== socket) return
+      setConnected(true)
+      if (switched) {
+        const notice: ClientMessage = {
+          type: 'project_switch',
+          content: `已切换项目，当前项目路径是 ${path}`,
+        }
+        socket.send(JSON.stringify(notice))
+      }
+    }
     socket.onclose = () => {
+      if (socketRef.current !== socket) return
       setConnected(false)
       setWaiting(false)
     }
-    socket.onmessage = (message) => handleEvent(JSON.parse(message.data) as ServerEvent)
+    socket.onmessage = (message) => {
+      if (socketRef.current === socket) handleEvent(JSON.parse(message.data) as ServerEvent)
+    }
+  }
 
-    return () => socket.close()
-  }, [])
+  function selectProject(path: string) {
+    if (path === activePath) return
+    const switched = activePath !== null
+    setMessages([])
+    activeMessageIdRef.current = null
+    messageCreatedAtRef.current.clear()
+    setActivePath(path)
+    connect(path, switched)
+  }
+
+  function addProject(project: Project) {
+    setProjects((current) => (
+      current.some((item) => item.path === project.path) ? current : [...current, project]
+    ))
+  }
 
   function handleEvent(event: ServerEvent) {
     if (event.type === 'message_start') {
@@ -35,13 +92,8 @@ export default function HomePage() {
     if (event.type === 'content_delta') {
       setMessages((current) => {
         const last = current.at(-1)
-        if (
-          last?.role === 'assistant'
-          && (last.id === event.messageId || last.parentMessageId === event.messageId)
-        ) {
-          return current.map((item) =>
-            item.id === last.id ? { ...item, content: item.content + event.delta } : item
-          )
+        if (last?.role === 'assistant' && (last.id === event.messageId || last.parentMessageId === event.messageId)) {
+          return current.map((item) => item.id === last.id ? { ...item, content: item.content + event.delta } : item)
         }
         return [...current, {
           id: crypto.randomUUID(),
@@ -56,13 +108,9 @@ export default function HomePage() {
     }
     if (event.type === 'tool_call_start') {
       setMessages((current) => [
-        ...current.map((item) =>
-          item.role === 'assistant'
-            && item.parentMessageId === event.messageId
-            && item.status === 'streaming'
-            ? { ...item, status: 'complete' as const }
-            : item
-        ),
+        ...current.map((item) => item.role === 'assistant' && item.parentMessageId === event.messageId && item.status === 'streaming'
+          ? { ...item, status: 'complete' as const }
+          : item),
         {
           id: event.toolCallId,
           role: 'tool',
@@ -77,20 +125,15 @@ export default function HomePage() {
       return
     }
     if (event.type === 'tool_call_result') {
-      setMessages((current) => current.map((item) =>
-        item.role === 'tool' && item.id === event.toolCallId
-          ? { ...item, result: event.result, status: event.isError ? 'error' : 'complete' }
-          : item
-      ))
+      setMessages((current) => current.map((item) => item.role === 'tool' && item.id === event.toolCallId
+        ? { ...item, result: event.result, status: event.isError ? 'error' : 'complete' }
+        : item))
       return
     }
     if (event.type === 'message_end') {
-      setMessages((current) => current.map((item) =>
-        (item.id === event.messageId || item.parentMessageId === event.messageId)
-          && item.status === 'streaming'
-          ? { ...item, status: 'complete' }
-          : item
-      ))
+      setMessages((current) => current.map((item) => (item.id === event.messageId || item.parentMessageId === event.messageId) && item.status === 'streaming'
+        ? { ...item, status: 'complete' }
+        : item))
       messageCreatedAtRef.current.delete(event.messageId)
       activeMessageIdRef.current = null
       setWaiting(false)
@@ -101,12 +144,8 @@ export default function HomePage() {
       const updated = current.map((item) => {
         if (item.status !== 'streaming') return item
         foundActiveNode = true
-        if (item.role === 'assistant') {
-          return { ...item, content: item.content || event.error.message, status: 'error' as const }
-        }
-        if (item.role === 'tool') {
-          return { ...item, result: item.result || event.error.message, status: 'error' as const }
-        }
+        if (item.role === 'assistant') return { ...item, content: item.content || event.error.message, status: 'error' as const }
+        if (item.role === 'tool') return { ...item, result: item.result || event.error.message, status: 'error' as const }
         return item
       })
       const messageId = activeMessageIdRef.current
@@ -128,7 +167,7 @@ export default function HomePage() {
 
   function send(content: string) {
     const socket = socketRef.current
-    if (!socket || socket.readyState !== WebSocket.OPEN) return
+    if (!socket || socket.readyState !== WebSocket.OPEN || !activePath) return
     const message: ClientMessage = { type: 'message', content }
     setMessages((current) => [...current, {
       id: crypto.randomUUID(),
@@ -142,13 +181,23 @@ export default function HomePage() {
   }
 
   return (
-    <div className="home-page">
-      <header className="home-page__header">
-        <strong>Agent</strong>
-        <span>{connected ? '已连接' : '连接中…'}</span>
-      </header>
-      <MessageArea messages={messages} />
-      <InputBox disabled={!connected || waiting} onSend={send} />
+    <div className="app-shell">
+      <ProjectSidebar
+        activePath={activePath}
+        collapsed={sidebarCollapsed}
+        onAdd={addProject}
+        onSelect={selectProject}
+        onToggle={() => setSidebarCollapsed((current) => !current)}
+        projects={projects}
+      />
+      <div className="home-page">
+        <header className="home-page__header">
+          <strong>{activePath ?? '请在侧边栏创建或选择一个项目'}</strong>
+          <span>{activePath ? (connected ? '已连接' : '连接中…') : '未选择项目'}</span>
+        </header>
+        <MessageArea messages={messages} />
+        <InputBox disabled={!activePath || !connected || waiting} onSend={send} />
+      </div>
     </div>
   )
 }

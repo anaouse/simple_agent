@@ -1,0 +1,118 @@
+.project-sidebar {
+  position: relative;
+  width: 320px;
+  min-width: 320px;
+  height: 100%;
+  border-right: 1px solid var(--gray-200);
+  background: var(--gray-100);
+  transition: width 160ms ease, min-width 160ms ease;
+}
+
+.project-sidebar--collapsed {
+  width: 28px;
+  min-width: 28px;
+}
+
+.project-sidebar__toggle {
+  position: absolute;
+  z-index: 1;
+  top: 18px;
+  right: -14px;
+  width: 28px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--gray-300);
+  border-radius: 7px;
+  background: var(--gray-0);
+  color: var(--gray-600);
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.project-sidebar__content {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  padding: 20px 18px;
+  overflow: hidden;
+}
+
+.project-sidebar__content h2 {
+  margin: 0 0 18px;
+  color: var(--gray-800);
+  font-size: 18px;
+}
+
+.project-sidebar__form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.project-sidebar__form input {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--gray-300);
+  border-radius: 7px;
+  outline: none;
+  background: var(--gray-0);
+  color: var(--gray-900);
+}
+
+.project-sidebar__form input:focus {
+  border-color: var(--red-400);
+}
+
+.project-sidebar__form button {
+  padding: 0 13px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--red-500);
+  color: var(--gray-0);
+  cursor: pointer;
+}
+
+.project-sidebar__form button:disabled,
+.project-sidebar__form input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.project-sidebar__error {
+  margin: 9px 0 0;
+  color: var(--red-600);
+  font-size: 13px;
+}
+
+.project-sidebar__list {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 18px;
+  overflow-y: auto;
+}
+
+.project-sidebar__item {
+  width: 100%;
+  padding: 10px 11px;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--gray-200);
+  border-radius: 7px;
+  background: var(--gray-0);
+  color: var(--gray-700);
+  cursor: pointer;
+  text-align: left;
+}
+
+.project-sidebar__item:hover {
+  border-color: var(--gray-400);
+}
+
+.project-sidebar__item--active {
+  border-color: var(--red-400);
+  background: var(--red-50);
+  color: var(--red-700);
+}

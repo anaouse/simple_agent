@@ -1,3 +1,11 @@
+export interface Project {
+  path: string
+}
+
+export interface ApiErrorResponse {
+  error: ErrorBody
+}
+
 export type MessageRole = 'user' | 'assistant' | 'tool'
 export type MessageStatus = 'complete' | 'streaming' | 'error'
 
@@ -24,7 +32,7 @@ export interface ToolChatMessage extends BaseChatMessage {
 export type ChatMessage = TextChatMessage | ToolChatMessage
 
 export interface ClientMessage {
-  type: 'message'
+  type: 'message' | 'project_switch'
   content: string
 }
 

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from app.tools.security import ensure_not_sensitive
+from app.tools.security import ensure_in_project
 
 MAX_LINES = 2000
 MAX_CHARS = 20_000
@@ -8,7 +8,7 @@ MAX_CHARS = 20_000
 
 def _read_one(path: str, offset: int, limit: int) -> str:
     """Read one file while keeping failures local to that file."""
-    error = ensure_not_sensitive(path)
+    error = ensure_in_project(path)
     if error:
         return f"[File: {path}]\n{error}"
 

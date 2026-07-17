@@ -1,8 +1,10 @@
 from datetime import UTC, datetime
+from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
 from pydantic import ValidationError
@@ -18,12 +20,39 @@ from app.models import (
     ErrorResponse,
     MessageEndEvent,
     MessageStartEvent,
+    ProjectRequest,
+    ProjectResponse,
     ToolCallResultEvent,
     ToolCallStartEvent,
 )
 
 SETTINGS = get_settings()
 app = FastAPI(title=SETTINGS.APP_NAME)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5000",
+        "http://127.0.0.1:5000",
+    ],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+class ProjectPathError(Exception):
+    pass
+
+
+@app.exception_handler(ProjectPathError)
+async def project_path_error_handler(
+    request: Request, exception: ProjectPathError
+) -> JSONResponse:
+    response = ErrorResponse(
+        error=ErrorBody(code="INVALID_PROJECT_PATH", message=str(exception))
+    )
+    return JSONResponse(status_code=400, content=response.model_dump(by_alias=True))
 
 
 @app.exception_handler(RequestValidationError)
@@ -46,10 +75,38 @@ async def unhandled_error_handler(request: Request, exception: Exception) -> JSO
     return JSONResponse(status_code=500, content=response.model_dump(by_alias=True))
 
 
+@app.post("/api/projects")
+async def create_project(request: ProjectRequest) -> ProjectResponse:
+    raw_path = request.path.strip()
+    path = Path(raw_path).expanduser()
+    if not raw_path or not path.is_absolute():
+        raise ProjectPathError("请输入有效的绝对文件夹路径")
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        if not path.is_dir():
+            raise ProjectPathError("该路径不是文件夹")
+        resolved = path.resolve(strict=True)
+    except ProjectPathError:
+        raise
+    except (OSError, RuntimeError) as exception:
+        logger.warning("Failed to create project directory {}: {}", raw_path, exception)
+        raise ProjectPathError("无法创建或访问该文件夹") from exception
+    return ProjectResponse(path=resolved.as_posix())
+
+
 @app.websocket("/ws/chat")
-async def chat(websocket: WebSocket) -> None:
+async def chat(websocket: WebSocket, project_path: str) -> None:
+    path = Path(project_path).expanduser()
+    try:
+        resolved = path.resolve(strict=True)
+        if not path.is_absolute() or not resolved.is_dir():
+            raise ValueError
+    except (OSError, RuntimeError, ValueError):
+        await websocket.close(code=1008, reason="Invalid project path")
+        return
+
     await websocket.accept()
-    agent = AnthropicAgent(SETTINGS)
+    agent = AnthropicAgent(SETTINGS, resolved)
 
     try:
         while True:
@@ -64,6 +121,10 @@ async def chat(websocket: WebSocket) -> None:
                         )
                     ),
                 )
+                continue
+
+            if message.type == "project_switch":
+                logger.info("Project switched: {}", resolved)
                 continue
 
             logger.info("User message received")
