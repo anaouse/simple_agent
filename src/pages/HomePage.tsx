@@ -16,9 +16,10 @@ import type {
   SessionResponse,
 } from '@/types'
 
-const API_BASE_URL = `${location.protocol}//${location.hostname}:2453/api`
-const WS_BASE_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:2453/ws/chat`
-const FILES_WS_BASE_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:2453/ws/project-files`
+const BACKEND_PORT = import.meta.env.VITE_BACKEND_PORT || '2453'
+const API_BASE_URL = `${location.protocol}//${location.hostname}:${BACKEND_PORT}/api`
+const WS_BASE_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:${BACKEND_PORT}/ws/chat`
+const FILES_WS_BASE_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:${BACKEND_PORT}/ws/project-files`
 const PROJECTS_STORAGE_KEY = 'agent-projects'
 
 function loadProjects(): Project[] {

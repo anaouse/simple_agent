@@ -2,7 +2,8 @@ import axios from 'axios'
 import { useEffect, useState } from 'react'
 import type { Project, SessionListResponse, SessionSummary } from '@/types'
 
-const API_URL = `${location.protocol}//${location.hostname}:2453/api/sessions`
+const BACKEND_PORT = import.meta.env.VITE_BACKEND_PORT || '2453'
+const API_URL = `${location.protocol}//${location.hostname}:${BACKEND_PORT}/api/sessions`
 
 interface ProjectItemProps {
   activePath: string | null

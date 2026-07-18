@@ -9,7 +9,7 @@
 ## 后端
 
 - 使用 FastAPI，所有接口的请求 / 响应数据必须用 Pydantic Model 定义，不允许裸 dict 或 `Any`
-- 服务端口固定为 `2453`
+- 部署环境后端端口固定为 `2453`，开发环境后端端口固定为 `2454`，使用全局变量VITE_BACKEND_PORT区分
 - 常规 REST 接口统一挂在 `/api/` 前缀下（如 `/api/sessions`、`/api/messages`），WebSocket 路径统一挂在 `/ws/` 前缀下，避免混在一起
 - 错误统一走 FastAPI 全局异常处理器（`exception_handler`），返回统一结构，错误码使用大写加下划线
   ```json

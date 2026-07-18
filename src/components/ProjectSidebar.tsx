@@ -3,7 +3,8 @@ import { FormEvent, useState } from 'react'
 import ProjectItem from '@/components/ProjectItem'
 import type { ApiErrorResponse, Project } from '@/types'
 
-const API_URL = `${location.protocol}//${location.hostname}:2453/api/projects`
+const BACKEND_PORT = import.meta.env.VITE_BACKEND_PORT || '2453'
+const API_URL = `${location.protocol}//${location.hostname}:${BACKEND_PORT}/api/projects`
 
 interface ProjectSidebarProps {
   activePath: string | null
