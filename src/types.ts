@@ -36,6 +36,17 @@ export interface ClientMessage {
   content: string
 }
 
+export interface ProjectFileEntry {
+  path: string
+  absolutePath: string
+  isDirectory: boolean
+}
+
+export interface ProjectFilesEvent {
+  type: 'project_files'
+  entries: ProjectFileEntry[]
+}
+
 export interface SessionResponse {
   sessionFile: string | null
   messages: ChatMessage[]

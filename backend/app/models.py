@@ -22,6 +22,17 @@ class ProjectResponse(ApiModel):
     path: str
 
 
+class ProjectFileEntry(ApiModel):
+    path: str
+    absolute_path: str
+    is_directory: bool
+
+
+class ProjectFilesEvent(ApiModel):
+    type: Literal["project_files"] = "project_files"
+    entries: list[ProjectFileEntry]
+
+
 class BaseChatMessage(ApiModel):
     id: str
     status: Literal["complete", "streaming", "error"]

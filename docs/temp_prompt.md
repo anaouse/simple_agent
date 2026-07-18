@@ -1,4 +1,4 @@
-1. inputbox 改为可以换行，而不是现在单独一行
-2. 项目最新一个对话记录为空的时候如果点击新对话又新创建一个json
-3. 工具加入bash，但是只允许使用ls，grep，find三个工具，并且在system prompt里面说明
-4. bash工具的实现可以参考 ../my_agent/src/idle/tools/bash.py
+看@D:/projects/agent/docs/specified.md了解项目
+1. 前端选择一个项目后，后端维护当前项目文件夹下已有的文件夹和文件，使用watchfiles库，如果后端文件新建或改变文件后发送给前端
+2. 参考： ../my_agent/src/idle/at_completer.py
+3. 前端InputBox支持 @ 命令，打@后跳出本项目下的文件夹和文件并且支持打字过滤

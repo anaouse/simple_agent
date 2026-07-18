@@ -12,6 +12,7 @@ from pydantic import ValidationError
 
 from app.ai.anthropic_agent import AnthropicAgent
 from app.config import get_settings
+from app.project_files import ProjectFileIndex
 from app.session import ConversationSession
 from app.models import (
     ApiModel,
@@ -166,6 +167,42 @@ def resolve_project_path(project_path: str) -> Path:
     except (OSError, RuntimeError, ValueError) as exception:
         raise ProjectPathError("请输入有效的绝对文件夹路径") from exception
     return resolved
+
+
+@app.websocket("/ws/project-files")
+async def project_files(websocket: WebSocket, project_path: str) -> None:
+    try:
+        resolved = resolve_project_path(project_path)
+    except ProjectPathError:
+        await websocket.close(code=1008, reason="Invalid project path")
+        return
+
+    await websocket.accept()
+    index = ProjectFileIndex(resolved)
+    changes = index.changes()
+    try:
+        await send_event(websocket, index.event())
+        while True:
+            change_task = asyncio.create_task(anext(changes))
+            disconnect_task = asyncio.create_task(websocket.receive_text())
+            done, pending = await asyncio.wait(
+                {change_task, disconnect_task},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in pending:
+                task.cancel()
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
+            if disconnect_task in done:
+                disconnect_task.result()
+                continue
+            await send_event(websocket, change_task.result())
+    except WebSocketDisconnect:
+        logger.info("Project files WebSocket disconnected: {}", resolved)
+    except asyncio.CancelledError:
+        logger.info("Project files watcher stopped: {}", resolved)
+    finally:
+        await changes.aclose()
 
 
 @app.websocket("/ws/chat")

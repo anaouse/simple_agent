@@ -25,6 +25,7 @@ print(SETTINGS.APP_NAME)
 ```
 - 关键节点必须打日志：收到用户消息、调用上游 API 开始/结束、工具调用开始/结束、异常。用 `loguru`
 - 放到app/文件夹当中，引用使用绝对路径引用，比如（from app.ai.anthropic_adaptor import AnthropicAdaptor）
+- 使用watchfile监控当前项目下方文件变化
 
 ---
 

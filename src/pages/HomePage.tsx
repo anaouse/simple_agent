@@ -10,12 +10,15 @@ import type {
   NewSessionResponse,
   OpenSessionRequest,
   Project,
+  ProjectFileEntry,
+  ProjectFilesEvent,
   ServerEvent,
   SessionResponse,
 } from '@/types'
 
 const API_BASE_URL = `${location.protocol}//${location.hostname}:2453/api`
 const WS_BASE_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:2453/ws/chat`
+const FILES_WS_BASE_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:2453/ws/project-files`
 const PROJECTS_STORAGE_KEY = 'agent-projects'
 
 function loadProjects(): Project[] {
@@ -37,6 +40,7 @@ export default function HomePage() {
   const [sessionRefreshVersion, setSessionRefreshVersion] = useState(0)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [projectFiles, setProjectFiles] = useState<ProjectFileEntry[]>([])
   const [connected, setConnected] = useState(false)
   const [waiting, setWaiting] = useState(false)
   const [startingSession, setStartingSession] = useState(false)
@@ -53,6 +57,21 @@ export default function HomePage() {
       socketRef.current?.close()
     }
   }, [])
+
+  useEffect(() => {
+    if (!activePath) {
+      setProjectFiles([])
+      return
+    }
+    const query = new URLSearchParams({ project_path: activePath })
+    const socket = new WebSocket(`${FILES_WS_BASE_URL}?${query.toString()}`)
+    socket.onmessage = (message) => {
+      const event = JSON.parse(message.data) as ProjectFilesEvent
+      if (event.type === 'project_files') setProjectFiles(event.entries)
+    }
+    socket.onclose = () => setProjectFiles([])
+    return () => socket.close()
+  }, [activePath])
 
   function connect(path: string, sessionFile?: string | null) {
     socketRef.current?.close()
@@ -261,6 +280,7 @@ export default function HomePage() {
         <MessageArea messages={messages} />
         <InputBox
           disabled={!activePath || !connected || waiting || startingSession}
+          files={projectFiles}
           newSessionDisabled={!activePath || startingSession}
           onNewSession={startNewSession}
           onSend={send}
