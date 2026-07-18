@@ -8,7 +8,7 @@ from loguru import logger
 from app.ai.anthropic_session_adaptor import AnthropicSessionAdaptor
 from app.config import Settings
 from app.models import ChatMessage
-from app.tools import edit, read, walk, write
+from app.tools import bash, edit, read, walk, write
 from app.tools.security import set_project_root
 from app.tools.tool_utils import tools_from_functions
 
@@ -53,7 +53,7 @@ class AnthropicAgent:
         base_prompt = self._read_system_prompt(settings.SYSTEM_PROMPT_PATH)
         self._system_prompt = self._build_system_prompt(base_prompt)
         self._tools, self._tool_functions = tools_from_functions(
-            [read, write, edit, walk]
+            [read, write, edit, walk, bash]
         )
 
     def load_session(self, messages: list[ChatMessage]) -> None:

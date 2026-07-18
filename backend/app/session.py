@@ -57,6 +57,22 @@ class ConversationSession:
         return self.messages
 
     def start_new(self) -> None:
+        # Reuse the latest session file if it is still empty, instead of
+        # creating another empty file every time "new session" is clicked.
+        files = self.list_files()
+        if files:
+            latest_path = self._directory / files[0]
+            try:
+                data = json.loads(latest_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                data = None
+            if data == []:
+                self._path = latest_path
+                self.messages = []
+                self._dirty = False
+                logger.info("Reused empty session: {}", self._path)
+                return
+
         self._directory.mkdir(parents=True, exist_ok=True)
         self._path = self._next_path()
         self._path.write_text("[]", encoding="utf-8")

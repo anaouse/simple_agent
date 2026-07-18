@@ -10,6 +10,11 @@ def set_project_root(path: Path) -> None:
     _project_root.set(path.resolve())
 
 
+def get_project_root() -> Path | None:
+    """Return the active project root for the current agent context."""
+    return _project_root.get()
+
+
 def ensure_not_sensitive(path: str | Path) -> str | None:
     """Reject paths containing a sensitive file or directory name."""
     candidate = Path(path)
