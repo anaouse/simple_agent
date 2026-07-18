@@ -5,7 +5,9 @@ from typing import Callable, Literal, TypedDict
 from anthropic import AsyncAnthropic
 from loguru import logger
 
+from app.ai.anthropic_session_adaptor import AnthropicSessionAdaptor
 from app.config import Settings
+from app.models import ChatMessage
 from app.tools import edit, read, walk, write
 from app.tools.security import set_project_root
 from app.tools.tool_utils import tools_from_functions
@@ -53,6 +55,9 @@ class AnthropicAgent:
         self._tools, self._tool_functions = tools_from_functions(
             [read, write, edit, walk]
         )
+
+    def load_session(self, messages: list[ChatMessage]) -> None:
+        self._messages = AnthropicSessionAdaptor.to_anthropic(messages)
 
     async def reply(self, user_content: str) -> AsyncIterator["AgentEvent"]:
         set_project_root(self._project_path)

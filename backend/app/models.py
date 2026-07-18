@@ -1,6 +1,6 @@
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, TypeAdapter
 
 
 class ApiModel(BaseModel):
@@ -10,7 +10,7 @@ class ApiModel(BaseModel):
 
 
 class ClientMessage(ApiModel):
-    type: Literal["message", "project_switch"]
+    type: Literal["message"]
     content: str = Field(min_length=1, max_length=100_000)
 
 
@@ -20,6 +20,34 @@ class ProjectRequest(ApiModel):
 
 class ProjectResponse(ApiModel):
     path: str
+
+
+class BaseChatMessage(ApiModel):
+    id: str
+    status: Literal["complete", "streaming", "error"]
+    created_at: str
+
+
+class TextChatMessage(BaseChatMessage):
+    role: Literal["user", "assistant"]
+    content: str
+    parent_message_id: str | None = None
+
+
+class ToolChatMessage(BaseChatMessage):
+    role: Literal["tool"]
+    parent_message_id: str
+    tool_name: str
+    arguments: dict[str, JsonValue]
+    result: str
+
+
+ChatMessage = Annotated[TextChatMessage | ToolChatMessage, Field(discriminator="role")]
+CHAT_MESSAGE_ADAPTER = TypeAdapter(ChatMessage)
+
+
+class SessionResponse(ApiModel):
+    messages: list[TextChatMessage | ToolChatMessage]
 
 
 class MessageStartEvent(ApiModel):

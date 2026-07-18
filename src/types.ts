@@ -32,8 +32,12 @@ export interface ToolChatMessage extends BaseChatMessage {
 export type ChatMessage = TextChatMessage | ToolChatMessage
 
 export interface ClientMessage {
-  type: 'message' | 'project_switch'
+  type: 'message'
   content: string
+}
+
+export interface SessionResponse {
+  messages: ChatMessage[]
 }
 
 export interface MessageStartEvent {

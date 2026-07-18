@@ -1,3 +1,5 @@
+# 1
+
 INFO:     127.0.0.1:58556 - "WebSocket /ws/chat?project_path=D%3A%2Fprojects%2Ftest" [accepted]
 INFO:     connection open
 2026-07-17 19:25:02.950 | INFO     | app.main:chat:130 - User message received
@@ -12,3 +14,4 @@ INFO:     connection open
 2026-07-17 19:25:47.606 | INFO     | app.ai.anthropic_agent:reply:81 - Upstream API call completed
 
 切换项目的时候会出现卡住挺久的情况，感觉是初始化的问题？
+

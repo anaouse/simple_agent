@@ -1,9 +1,11 @@
+import axios from 'axios'
 import { useEffect, useRef, useState } from 'react'
 import InputBox from '@/components/InputBox'
 import MessageArea from '@/components/MessageArea'
 import ProjectSidebar from '@/components/ProjectSidebar'
-import type { ChatMessage, ClientMessage, Project, ServerEvent } from '@/types'
+import type { ChatMessage, ClientMessage, Project, ServerEvent, SessionResponse } from '@/types'
 
+const API_BASE_URL = `${location.protocol}//${location.hostname}:2453/api`
 const WS_BASE_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:2453/ws/chat`
 const PROJECTS_STORAGE_KEY = 'agent-projects'
 
@@ -40,7 +42,7 @@ export default function HomePage() {
     }
   }, [])
 
-  function connect(path: string, switched: boolean) {
+  function connect(path: string) {
     socketRef.current?.close()
     setConnected(false)
     setWaiting(false)
@@ -49,13 +51,6 @@ export default function HomePage() {
     socket.onopen = () => {
       if (socketRef.current !== socket) return
       setConnected(true)
-      if (switched) {
-        const notice: ClientMessage = {
-          type: 'project_switch',
-          content: `已切换项目，当前项目路径是 ${path}`,
-        }
-        socket.send(JSON.stringify(notice))
-      }
     }
     socket.onclose = () => {
       if (socketRef.current !== socket) return
@@ -67,14 +62,28 @@ export default function HomePage() {
     }
   }
 
-  function selectProject(path: string) {
+  async function selectProject(path: string) {
     if (path === activePath) return
-    const switched = activePath !== null
+    const currentSocket = socketRef.current
+    if (currentSocket && currentSocket.readyState !== WebSocket.CLOSED) {
+      await new Promise<void>((resolve) => {
+        currentSocket.addEventListener('close', () => resolve(), { once: true })
+        currentSocket.close()
+      })
+    }
     setMessages([])
     activeMessageIdRef.current = null
     messageCreatedAtRef.current.clear()
     setActivePath(path)
-    connect(path, switched)
+    try {
+      const response = await axios.get<SessionResponse>(`${API_BASE_URL}/sessions/current`, {
+        params: { project_path: path },
+      })
+      setMessages(response.data.messages)
+    } catch {
+      setMessages([])
+    }
+    connect(path)
   }
 
   function addProject(project: Project) {

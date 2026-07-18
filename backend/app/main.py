@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from app.ai.anthropic_agent import AnthropicAgent
 from app.config import get_settings
+from app.session import ConversationSession
 from app.models import (
     ApiModel,
     ClientMessage,
@@ -22,6 +23,7 @@ from app.models import (
     MessageStartEvent,
     ProjectRequest,
     ProjectResponse,
+    SessionResponse,
     ToolCallResultEvent,
     ToolCallStartEvent,
 )
@@ -94,6 +96,29 @@ async def create_project(request: ProjectRequest) -> ProjectResponse:
     return ProjectResponse(path=resolved.as_posix())
 
 
+@app.get("/api/sessions/current")
+async def get_current_session(project_path: str) -> SessionResponse:
+    resolved = resolve_project_path(project_path)
+    session = ConversationSession(SETTINGS.DATA_DIR, resolved)
+    try:
+        messages = session.load_latest()
+    except (OSError, ValueError):
+        logger.exception("Failed to load session for {}", resolved)
+        messages = []
+    return SessionResponse(messages=messages)
+
+
+def resolve_project_path(project_path: str) -> Path:
+    path = Path(project_path).expanduser()
+    try:
+        resolved = path.resolve(strict=True)
+        if not path.is_absolute() or not resolved.is_dir():
+            raise ValueError
+    except (OSError, RuntimeError, ValueError) as exception:
+        raise ProjectPathError("请输入有效的绝对文件夹路径") from exception
+    return resolved
+
+
 @app.websocket("/ws/chat")
 async def chat(websocket: WebSocket, project_path: str) -> None:
     path = Path(project_path).expanduser()
@@ -106,7 +131,13 @@ async def chat(websocket: WebSocket, project_path: str) -> None:
         return
 
     await websocket.accept()
+    session = ConversationSession(SETTINGS.DATA_DIR, resolved)
+    try:
+        session.load_latest()
+    except (OSError, ValueError):
+        logger.exception("Failed to load session for {}", resolved)
     agent = AnthropicAgent(SETTINGS, resolved)
+    agent.load_session(session.messages)
 
     try:
         while True:
@@ -123,23 +154,19 @@ async def chat(websocket: WebSocket, project_path: str) -> None:
                 )
                 continue
 
-            if message.type == "project_switch":
-                logger.info("Project switched: {}", resolved)
-                continue
-
             logger.info("User message received")
             message_id = str(uuid4())
+            created_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+            session.append_user(message.content)
             await send_event(
                 websocket,
-                MessageStartEvent(
-                    message_id=message_id,
-                    created_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-                ),
+                MessageStartEvent(message_id=message_id, created_at=created_at),
             )
 
             try:
                 async for event in agent.reply(message.content):
                     if event["type"] == "content_delta":
+                        session.append_delta(message_id, event["delta"], created_at)
                         await send_event(
                             websocket,
                             ContentDeltaEvent(
@@ -147,6 +174,13 @@ async def chat(websocket: WebSocket, project_path: str) -> None:
                             ),
                         )
                     elif event["type"] == "tool_call_start":
+                        session.start_tool(
+                            message_id,
+                            event["tool_call_id"],
+                            event["tool_name"],
+                            event["arguments"],
+                            created_at,
+                        )
                         await send_event(
                             websocket,
                             ToolCallStartEvent(
@@ -157,6 +191,9 @@ async def chat(websocket: WebSocket, project_path: str) -> None:
                             ),
                         )
                     else:
+                        session.finish_tool(
+                            event["tool_call_id"], event["result"], event["is_error"]
+                        )
                         await send_event(
                             websocket,
                             ToolCallResultEvent(
@@ -166,8 +203,14 @@ async def chat(websocket: WebSocket, project_path: str) -> None:
                                 is_error=event["is_error"],
                             ),
                         )
+                session.finish_message(message_id)
+                session.save()
                 await send_event(websocket, MessageEndEvent(message_id=message_id))
+            except WebSocketDisconnect:
+                raise
             except Exception:
+                session.interrupt()
+                session.save()
                 await send_event(
                     websocket,
                     ErrorEvent(
@@ -179,6 +222,8 @@ async def chat(websocket: WebSocket, project_path: str) -> None:
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected")
     finally:
+        session.interrupt()
+        session.save()
         await agent.close()
 
 

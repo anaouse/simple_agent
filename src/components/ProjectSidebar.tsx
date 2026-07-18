@@ -9,7 +9,7 @@ interface ProjectSidebarProps {
   collapsed: boolean
   projects: Project[]
   onAdd: (project: Project) => void
-  onSelect: (path: string) => void
+  onSelect: (path: string) => void | Promise<void>
   onToggle: () => void
 }
 
