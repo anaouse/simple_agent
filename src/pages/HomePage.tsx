@@ -3,7 +3,16 @@ import { useEffect, useRef, useState } from 'react'
 import InputBox from '@/components/InputBox'
 import MessageArea from '@/components/MessageArea'
 import ProjectSidebar from '@/components/ProjectSidebar'
-import type { ChatMessage, ClientMessage, Project, ServerEvent, SessionResponse } from '@/types'
+import type {
+  ChatMessage,
+  ClientMessage,
+  NewSessionRequest,
+  NewSessionResponse,
+  OpenSessionRequest,
+  Project,
+  ServerEvent,
+  SessionResponse,
+} from '@/types'
 
 const API_BASE_URL = `${location.protocol}//${location.hostname}:2453/api`
 const WS_BASE_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:2453/ws/chat`
@@ -24,10 +33,13 @@ function loadProjects(): Project[] {
 export default function HomePage() {
   const [projects, setProjects] = useState<Project[]>(loadProjects)
   const [activePath, setActivePath] = useState<string | null>(null)
+  const [activeSessionFile, setActiveSessionFile] = useState<string | null>(null)
+  const [sessionRefreshVersion, setSessionRefreshVersion] = useState(0)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [connected, setConnected] = useState(false)
   const [waiting, setWaiting] = useState(false)
+  const [startingSession, setStartingSession] = useState(false)
   const socketRef = useRef<WebSocket | null>(null)
   const activeMessageIdRef = useRef<string | null>(null)
   const messageCreatedAtRef = useRef(new Map<string, string>())
@@ -42,11 +54,13 @@ export default function HomePage() {
     }
   }, [])
 
-  function connect(path: string) {
+  function connect(path: string, sessionFile?: string | null) {
     socketRef.current?.close()
     setConnected(false)
     setWaiting(false)
-    const socket = new WebSocket(`${WS_BASE_URL}?project_path=${encodeURIComponent(path)}`)
+    const query = new URLSearchParams({ project_path: path })
+    if (sessionFile) query.set('session_file', sessionFile)
+    const socket = new WebSocket(`${WS_BASE_URL}?${query.toString()}`)
     socketRef.current = socket
     socket.onopen = () => {
       if (socketRef.current !== socket) return
@@ -75,15 +89,33 @@ export default function HomePage() {
     activeMessageIdRef.current = null
     messageCreatedAtRef.current.clear()
     setActivePath(path)
+    let sessionFile: string | null = null
     try {
       const response = await axios.get<SessionResponse>(`${API_BASE_URL}/sessions/current`, {
         params: { project_path: path },
       })
       setMessages(response.data.messages)
+      sessionFile = response.data.sessionFile
+      setActiveSessionFile(sessionFile)
     } catch {
       setMessages([])
+      setActiveSessionFile(null)
     }
-    connect(path)
+    connect(path, sessionFile)
+  }
+
+  async function selectSession(path: string, fileName: string) {
+    if (path === activePath && fileName === activeSessionFile) return
+    const request: OpenSessionRequest = { projectPath: path, sessionFile: fileName }
+    const response = await axios.post<SessionResponse>(`${API_BASE_URL}/sessions/open`, request)
+    socketRef.current?.close()
+    setActivePath(path)
+    setActiveSessionFile(response.data.sessionFile)
+    setMessages(response.data.messages)
+    setWaiting(false)
+    activeMessageIdRef.current = null
+    messageCreatedAtRef.current.clear()
+    connect(path, response.data.sessionFile)
   }
 
   function addProject(project: Project) {
@@ -174,6 +206,25 @@ export default function HomePage() {
     setWaiting(false)
   }
 
+  async function startNewSession() {
+    if (!activePath || startingSession) return
+    setStartingSession(true)
+    try {
+      const request: NewSessionRequest = { projectPath: activePath }
+      const response = await axios.post<NewSessionResponse>(`${API_BASE_URL}/sessions`, request)
+      socketRef.current?.close()
+      setMessages([])
+      setActiveSessionFile(response.data.sessionFile)
+      setSessionRefreshVersion((current) => current + 1)
+      setWaiting(false)
+      activeMessageIdRef.current = null
+      messageCreatedAtRef.current.clear()
+      connect(activePath, response.data.sessionFile)
+    } finally {
+      setStartingSession(false)
+    }
+  }
+
   function send(content: string) {
     const socket = socketRef.current
     if (!socket || socket.readyState !== WebSocket.OPEN || !activePath) return
@@ -193,11 +244,14 @@ export default function HomePage() {
     <div className="app-shell">
       <ProjectSidebar
         activePath={activePath}
+        activeSessionFile={activeSessionFile}
         collapsed={sidebarCollapsed}
         onAdd={addProject}
         onSelect={selectProject}
+        onSelectSession={selectSession}
         onToggle={() => setSidebarCollapsed((current) => !current)}
         projects={projects}
+        sessionRefreshVersion={sessionRefreshVersion}
       />
       <div className="home-page">
         <header className="home-page__header">
@@ -205,7 +259,12 @@ export default function HomePage() {
           <span>{activePath ? (connected ? '已连接' : '连接中…') : '未选择项目'}</span>
         </header>
         <MessageArea messages={messages} />
-        <InputBox disabled={!activePath || !connected || waiting} onSend={send} />
+        <InputBox
+          disabled={!activePath || !connected || waiting || startingSession}
+          newSessionDisabled={!activePath || startingSession}
+          onNewSession={startNewSession}
+          onSend={send}
+        />
       </div>
     </div>
   )

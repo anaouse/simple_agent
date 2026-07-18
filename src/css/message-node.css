@@ -1,6 +1,5 @@
 .message-node {
   margin-bottom: 12px;
-  overflow: hidden;
   border: 1px solid var(--gray-200);
   border-radius: 10px;
   background: var(--gray-0);
@@ -18,7 +17,8 @@
 .message-node__header {
   display: flex;
   width: 100%;
-  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
   padding: 12px 14px;
   border: 0;
   background: transparent;
@@ -27,7 +27,31 @@
   text-align: left;
 }
 
+.message-node--expanded .message-node__header {
+  position: sticky;
+  top: -20px;
+  z-index: 1;
+  border-radius: 9px 9px 0 0;
+  background: inherit;
+}
+
+.message-node__title,
 .message-node__meta {
+  flex: none;
+}
+
+.message-node__preview {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--gray-500);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-node__meta {
+  margin-left: auto;
   color: var(--gray-500);
   font-size: 13px;
 }

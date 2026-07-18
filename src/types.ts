@@ -37,7 +37,30 @@ export interface ClientMessage {
 }
 
 export interface SessionResponse {
+  sessionFile: string | null
   messages: ChatMessage[]
+}
+
+export interface SessionSummary {
+  fileName: string
+}
+
+export interface SessionListResponse {
+  sessions: SessionSummary[]
+}
+
+export interface OpenSessionRequest {
+  projectPath: string
+  sessionFile: string
+}
+
+export interface NewSessionRequest {
+  projectPath: string
+}
+
+export interface NewSessionResponse {
+  projectPath: string
+  sessionFile: string
 }
 
 export interface MessageStartEvent {

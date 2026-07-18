@@ -47,7 +47,33 @@ CHAT_MESSAGE_ADAPTER = TypeAdapter(ChatMessage)
 
 
 class SessionResponse(ApiModel):
+    session_file: str | None = None
     messages: list[TextChatMessage | ToolChatMessage]
+
+
+class SessionSummary(ApiModel):
+    file_name: str
+
+
+class SessionListResponse(ApiModel):
+    sessions: list[SessionSummary]
+
+
+class SessionRequest(ApiModel):
+    project_path: str = Field(min_length=1, max_length=4096)
+
+
+class NewSessionRequest(SessionRequest):
+    pass
+
+
+class OpenSessionRequest(SessionRequest):
+    session_file: str = Field(min_length=6, max_length=255)
+
+
+class NewSessionResponse(ApiModel):
+    project_path: str
+    session_file: str
 
 
 class MessageStartEvent(ApiModel):

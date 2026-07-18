@@ -22,22 +22,47 @@ class ConversationSession:
         self._dirty = False
         self.messages: list[ChatMessage] = []
 
-    def load_latest(self) -> list[ChatMessage]:
+    @property
+    def file_name(self) -> str | None:
+        return self._path.name if self._path is not None else None
+
+    def list_files(self) -> list[str]:
         if not self._directory.is_dir():
             return []
-        for temporary in self._directory.glob("*.json.tmp"):
-            try:
-                temporary.unlink()
-            except OSError:
-                logger.warning("Failed to remove stale session file: {}", temporary)
-        files = sorted(self._directory.glob("*.json"), key=lambda path: path.stat().st_mtime)
+        return [
+            path.name
+            for path in sorted(
+                self._directory.glob("*.json"),
+                key=lambda item: item.stat().st_mtime,
+                reverse=True,
+            )
+        ]
+
+    def load_latest(self) -> list[ChatMessage]:
+        files = self.list_files()
         if not files:
             return []
-        self._path = files[-1]
-        data = json.loads(self._path.read_text(encoding="utf-8"))
+        return self.load(files[0])
+
+    def load(self, file_name: str) -> list[ChatMessage]:
+        if Path(file_name).name != file_name or not file_name.endswith(".json"):
+            raise ValueError("Invalid session file")
+        path = self._directory / file_name
+        if not path.is_file():
+            raise ValueError("Session file does not exist")
+        self._path = path
+        data = json.loads(path.read_text(encoding="utf-8"))
         self.messages = [CHAT_MESSAGE_ADAPTER.validate_python(item) for item in data]
         self._dirty = False
         return self.messages
+
+    def start_new(self) -> None:
+        self._directory.mkdir(parents=True, exist_ok=True)
+        self._path = self._next_path()
+        self._path.write_text("[]", encoding="utf-8")
+        self.messages = []
+        self._dirty = False
+        logger.info("Session created: {}", self._path)
 
     def append_user(self, content: str) -> None:
         self._dirty = True
@@ -128,9 +153,7 @@ class ConversationSession:
             return
         self._directory.mkdir(parents=True, exist_ok=True)
         if self._path is None:
-            # Colons are invalid in Windows filenames, so use hyphens in the time part.
-            filename = datetime.now().astimezone().strftime("%Y-%m-%d %H-%M-%S.json")
-            self._path = self._directory / filename
+            self._path = self._next_path()
         self._path.write_text(
             json.dumps(
                 [message.model_dump(by_alias=True) for message in self.messages],
@@ -141,6 +164,16 @@ class ConversationSession:
         )
         self._dirty = False
         logger.info("Session saved: {}", self._path)
+
+    def _next_path(self) -> Path:
+        # Colons are invalid in Windows filenames, so use hyphens in the time part.
+        stem = datetime.now().astimezone().strftime("%Y-%m-%d %H-%M-%S")
+        path = self._directory / f"{stem}.json"
+        suffix = 1
+        while path.exists():
+            path = self._directory / f"{stem}-{suffix}.json"
+            suffix += 1
+        return path
 
     def _complete_assistant_nodes(self, message_id: str) -> None:
         for message in self.messages:

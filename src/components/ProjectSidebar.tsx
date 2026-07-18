@@ -1,24 +1,31 @@
 import axios from 'axios'
 import { FormEvent, useState } from 'react'
+import ProjectItem from '@/components/ProjectItem'
 import type { ApiErrorResponse, Project } from '@/types'
 
 const API_URL = `${location.protocol}//${location.hostname}:2453/api/projects`
 
 interface ProjectSidebarProps {
   activePath: string | null
+  activeSessionFile: string | null
   collapsed: boolean
   projects: Project[]
+  sessionRefreshVersion: number
   onAdd: (project: Project) => void
   onSelect: (path: string) => void | Promise<void>
+  onSelectSession: (path: string, fileName: string) => void | Promise<void>
   onToggle: () => void
 }
 
 export default function ProjectSidebar({
   activePath,
+  activeSessionFile,
   collapsed,
   projects,
+  sessionRefreshVersion,
   onAdd,
   onSelect,
+  onSelectSession,
   onToggle,
 }: ProjectSidebarProps) {
   const [path, setPath] = useState('')
@@ -72,15 +79,15 @@ export default function ProjectSidebar({
           {error && <p className="project-sidebar__error">{error}</p>}
           <div className="project-sidebar__list">
             {projects.map((project) => (
-              <button
-                className={project.path === activePath ? 'project-sidebar__item project-sidebar__item--active' : 'project-sidebar__item'}
+              <ProjectItem
+                activePath={activePath}
+                activeSessionFile={activeSessionFile}
                 key={project.path}
-                onClick={() => onSelect(project.path)}
-                title={project.path}
-                type="button"
-              >
-                {project.path}
-              </button>
+                onSelectProject={onSelect}
+                onSelectSession={onSelectSession}
+                project={project}
+                refreshVersion={sessionRefreshVersion}
+              />
             ))}
           </div>
         </div>

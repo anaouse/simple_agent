@@ -1,6 +1,6 @@
 .input-box {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: auto 1fr auto;
   gap: 10px;
   padding: 16px 20px;
   border-top: 1px solid var(--gray-200);
@@ -28,6 +28,12 @@
   background: var(--red-500);
   color: var(--gray-0);
   cursor: pointer;
+}
+
+.input-box .input-box__new-session {
+  border: 1px solid var(--gray-300);
+  background: var(--gray-0);
+  color: var(--gray-700);
 }
 
 .input-box button:disabled,

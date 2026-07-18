@@ -20,6 +20,14 @@ function statusText(message: ChatMessage, expanded: boolean) {
   return expanded ? '收起' : '展开'
 }
 
+function messagePreview(message: ChatMessage) {
+  const content = message.role === 'tool'
+    ? message.result || JSON.stringify(message.arguments)
+    : message.content
+  const normalized = content.replace(/\s+/g, ' ').trim()
+  return normalized.length > 80 ? `${normalized.slice(0, 80)}…` : normalized
+}
+
 export default function MessageNode({ message }: MessageNodeProps) {
   const [expanded, setExpanded] = useState(false)
   const title = message.role === 'user'
@@ -29,9 +37,10 @@ export default function MessageNode({ message }: MessageNodeProps) {
       : `工具 · ${message.toolName}`
 
   return (
-    <article className={`message-node message-node--${message.role}`}>
+    <article className={`message-node message-node--${message.role}${expanded ? ' message-node--expanded' : ''}`}>
       <button className="message-node__header" onClick={() => setExpanded(!expanded)} type="button">
-        <span>{title}</span>
+        <span className="message-node__title">{title}</span>
+        {!expanded && <span className="message-node__preview">{messagePreview(message)}</span>}
         <span className="message-node__meta">{statusText(message, expanded)}</span>
       </button>
       {expanded && (

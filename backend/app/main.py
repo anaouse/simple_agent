@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
@@ -21,14 +22,20 @@ from app.models import (
     ErrorResponse,
     MessageEndEvent,
     MessageStartEvent,
+    NewSessionRequest,
+    NewSessionResponse,
+    OpenSessionRequest,
     ProjectRequest,
     ProjectResponse,
+    SessionListResponse,
     SessionResponse,
+    SessionSummary,
     ToolCallResultEvent,
     ToolCallStartEvent,
 )
 
 SETTINGS = get_settings()
+ACTIVE_CHATS: dict[str, asyncio.Task[None]] = {}
 app = FastAPI(title=SETTINGS.APP_NAME)
 app.add_middleware(
     CORSMiddleware,
@@ -96,6 +103,27 @@ async def create_project(request: ProjectRequest) -> ProjectResponse:
     return ProjectResponse(path=resolved.as_posix())
 
 
+@app.post("/api/sessions")
+async def create_session(request: NewSessionRequest) -> NewSessionResponse:
+    resolved = resolve_project_path(request.project_path)
+    await interrupt_active_chat(resolved)
+    session = ConversationSession(SETTINGS.DATA_DIR, resolved)
+    session.start_new()
+    logger.info("New session started for project: {}", resolved)
+    return NewSessionResponse(
+        project_path=resolved.as_posix(), session_file=session.file_name or ""
+    )
+
+
+@app.get("/api/sessions")
+async def list_sessions(project_path: str) -> SessionListResponse:
+    resolved = resolve_project_path(project_path)
+    session = ConversationSession(SETTINGS.DATA_DIR, resolved)
+    return SessionListResponse(
+        sessions=[SessionSummary(file_name=name) for name in session.list_files()]
+    )
+
+
 @app.get("/api/sessions/current")
 async def get_current_session(project_path: str) -> SessionResponse:
     resolved = resolve_project_path(project_path)
@@ -105,7 +133,28 @@ async def get_current_session(project_path: str) -> SessionResponse:
     except (OSError, ValueError):
         logger.exception("Failed to load session for {}", resolved)
         messages = []
-    return SessionResponse(messages=messages)
+    return SessionResponse(session_file=session.file_name, messages=messages)
+
+
+@app.post("/api/sessions/open")
+async def open_session(request: OpenSessionRequest) -> SessionResponse:
+    resolved = resolve_project_path(request.project_path)
+    await interrupt_active_chat(resolved)
+    session = ConversationSession(SETTINGS.DATA_DIR, resolved)
+    messages = session.load(request.session_file)
+    logger.info("Session opened: {}", session.file_name)
+    return SessionResponse(session_file=session.file_name, messages=messages)
+
+
+async def interrupt_active_chat(project_path: Path) -> None:
+    active_chat = ACTIVE_CHATS.get(project_path.as_posix())
+    if active_chat is None or active_chat.done():
+        return
+    active_chat.cancel()
+    try:
+        await active_chat
+    except asyncio.CancelledError:
+        pass
 
 
 def resolve_project_path(project_path: str) -> Path:
@@ -120,7 +169,9 @@ def resolve_project_path(project_path: str) -> Path:
 
 
 @app.websocket("/ws/chat")
-async def chat(websocket: WebSocket, project_path: str) -> None:
+async def chat(
+    websocket: WebSocket, project_path: str, session_file: str | None = None
+) -> None:
     path = Path(project_path).expanduser()
     try:
         resolved = path.resolve(strict=True)
@@ -131,9 +182,16 @@ async def chat(websocket: WebSocket, project_path: str) -> None:
         return
 
     await websocket.accept()
+    project_key = resolved.as_posix()
+    current_task = asyncio.current_task()
+    if current_task is not None:
+        ACTIVE_CHATS[project_key] = current_task
     session = ConversationSession(SETTINGS.DATA_DIR, resolved)
     try:
-        session.load_latest()
+        if session_file is None:
+            session.load_latest()
+        else:
+            session.load(session_file)
     except (OSError, ValueError):
         logger.exception("Failed to load session for {}", resolved)
     agent = AnthropicAgent(SETTINGS, resolved)
@@ -221,10 +279,14 @@ async def chat(websocket: WebSocket, project_path: str) -> None:
                 )
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected")
+    except asyncio.CancelledError:
+        logger.info("WebSocket chat interrupted for new session: {}", resolved)
     finally:
         session.interrupt()
         session.save()
         await agent.close()
+        if current_task is not None and ACTIVE_CHATS.get(project_key) is current_task:
+            ACTIVE_CHATS.pop(project_key, None)
 
 
 async def send_event(websocket: WebSocket, event: ApiModel) -> None:
