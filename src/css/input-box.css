@@ -4,7 +4,6 @@
   align-items: end;
   gap: 10px;
   padding: 16px 20px;
-  border-top: 1px solid var(--gray-200);
   background: var(--gray-0);
 }
 

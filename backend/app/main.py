@@ -11,7 +11,7 @@ from loguru import logger
 from pydantic import ValidationError
 
 from app.ai.anthropic_agent import AnthropicAgent
-from app.config import get_settings
+from app.config import get_agent_config, get_model_config, get_settings
 from app.project_files import ProjectFileIndex
 from app.session import ConversationSession
 from app.models import (
@@ -23,6 +23,8 @@ from app.models import (
     ErrorResponse,
     MessageEndEvent,
     MessageStartEvent,
+    ModelListResponse,
+    ModelSummary,
     NewSessionRequest,
     NewSessionResponse,
     OpenSessionRequest,
@@ -83,6 +85,16 @@ async def unhandled_error_handler(request: Request, exception: Exception) -> JSO
         error=ErrorBody(code="INTERNAL_ERROR", message="服务器内部错误")
     )
     return JSONResponse(status_code=500, content=response.model_dump(by_alias=True))
+
+
+@app.get("/api/models")
+async def list_models() -> ModelListResponse:
+    return ModelListResponse(
+        models=[
+            ModelSummary(name=model.name, compatible=model.compatible)
+            for model in get_agent_config().models
+        ]
+    )
 
 
 @app.post("/api/projects")
@@ -207,7 +219,10 @@ async def project_files(websocket: WebSocket, project_path: str) -> None:
 
 @app.websocket("/ws/chat")
 async def chat(
-    websocket: WebSocket, project_path: str, session_file: str | None = None
+    websocket: WebSocket,
+    project_path: str,
+    session_file: str | None = None,
+    model: str | None = None,
 ) -> None:
     path = Path(project_path).expanduser()
     try:
@@ -216,6 +231,13 @@ async def chat(
             raise ValueError
     except (OSError, RuntimeError, ValueError):
         await websocket.close(code=1008, reason="Invalid project path")
+        return
+    try:
+        model_config = get_model_config(model)
+        if model_config.compatible != "anthropic":
+            raise ValueError
+    except ValueError:
+        await websocket.close(code=1008, reason="Invalid model")
         return
 
     await websocket.accept()
@@ -231,7 +253,7 @@ async def chat(
             session.load(session_file)
     except (OSError, ValueError):
         logger.exception("Failed to load session for {}", resolved)
-    agent = AnthropicAgent(SETTINGS, resolved)
+    agent = AnthropicAgent(SETTINGS, model_config, resolved)
     agent.load_session(session.messages)
 
     try:

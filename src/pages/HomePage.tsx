@@ -3,9 +3,12 @@ import { useEffect, useRef, useState } from 'react'
 import InputBox from '@/components/InputBox'
 import MessageArea from '@/components/MessageArea'
 import ProjectSidebar from '@/components/ProjectSidebar'
+import SessionInfo from '@/components/SessionInfo'
 import type {
   ChatMessage,
   ClientMessage,
+  ModelListResponse,
+  ModelSummary,
   NewSessionRequest,
   NewSessionResponse,
   OpenSessionRequest,
@@ -41,6 +44,8 @@ export default function HomePage() {
   const [sessionRefreshVersion, setSessionRefreshVersion] = useState(0)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [models, setModels] = useState<ModelSummary[]>([])
+  const [activeModelName, setActiveModelName] = useState<string | null>(null)
   const [projectFiles, setProjectFiles] = useState<ProjectFileEntry[]>([])
   const [connected, setConnected] = useState(false)
   const [waiting, setWaiting] = useState(false)
@@ -48,6 +53,16 @@ export default function HomePage() {
   const socketRef = useRef<WebSocket | null>(null)
   const activeMessageIdRef = useRef<string | null>(null)
   const messageCreatedAtRef = useRef(new Map<string, string>())
+
+  useEffect(() => {
+    axios.get<ModelListResponse>(`${API_BASE_URL}/models`).then((response) => {
+      setModels(response.data.models)
+      setActiveModelName(response.data.models[0]?.name ?? null)
+    }).catch(() => {
+      setModels([])
+      setActiveModelName(null)
+    })
+  }, [])
 
   useEffect(() => {
     localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects))
@@ -74,12 +89,13 @@ export default function HomePage() {
     return () => socket.close()
   }, [activePath])
 
-  function connect(path: string, sessionFile?: string | null) {
+  function connect(path: string, sessionFile?: string | null, modelName = activeModelName) {
     socketRef.current?.close()
     setConnected(false)
     setWaiting(false)
     const query = new URLSearchParams({ project_path: path })
     if (sessionFile) query.set('session_file', sessionFile)
+    if (modelName) query.set('model', modelName)
     const socket = new WebSocket(`${WS_BASE_URL}?${query.toString()}`)
     socketRef.current = socket
     socket.onopen = () => {
@@ -245,6 +261,12 @@ export default function HomePage() {
     }
   }
 
+  function selectModel(modelName: string) {
+    if (modelName === activeModelName) return
+    setActiveModelName(modelName)
+    if (activePath) connect(activePath, activeSessionFile, modelName)
+  }
+
   function send(content: string) {
     const socket = socketRef.current
     if (!socket || socket.readyState !== WebSocket.OPEN || !activePath) return
@@ -279,10 +301,13 @@ export default function HomePage() {
           <span>{activePath ? (connected ? '已连接' : '连接中…') : '未选择项目'}</span>
         </header>
         <MessageArea messages={messages} />
+        <SessionInfo modelName={activeModelName} />
         <InputBox
           disabled={!activePath || !connected || waiting || startingSession}
           files={projectFiles}
+          models={models}
           newSessionDisabled={!activePath || startingSession}
+          onModelSelect={selectModel}
           onNewSession={startNewSession}
           onSend={send}
         />

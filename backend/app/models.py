@@ -14,6 +14,15 @@ class ClientMessage(ApiModel):
     content: str = Field(min_length=1, max_length=100_000)
 
 
+class ModelSummary(ApiModel):
+    name: str
+    compatible: str
+
+
+class ModelListResponse(ApiModel):
+    models: list[ModelSummary]
+
+
 class ProjectRequest(ApiModel):
     path: str = Field(min_length=1, max_length=4096)
 

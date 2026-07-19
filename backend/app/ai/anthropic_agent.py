@@ -6,7 +6,7 @@ from anthropic import AsyncAnthropic
 from loguru import logger
 
 from app.ai.anthropic_session_adaptor import AnthropicSessionAdaptor
-from app.config import Settings
+from app.config import ModelConfig, Settings
 from app.models import ChatMessage
 from app.tools import bash, edit, read, walk, write
 from app.tools.security import set_project_root
@@ -41,13 +41,17 @@ AgentEvent = ContentDelta | ToolCallStart | ToolCallResult
 
 
 class AnthropicAgent:
-    def __init__(self, settings: Settings, project_path: Path) -> None:
-        self._settings = settings
+    def __init__(
+        self, settings: Settings, model: ModelConfig, project_path: Path
+    ) -> None:
+        if model.compatible != "anthropic":
+            raise ValueError(f"暂不支持的模型兼容格式: {model.compatible}")
+        self._model = model
         self._project_path = project_path.resolve()
         set_project_root(self._project_path)
         self._client = AsyncAnthropic(
-            api_key=settings.API_KEY,
-            base_url=settings.ANTHROPIC_URL,
+            api_key=model.api_key,
+            base_url=model.url,
         )
         self._messages: list[dict[str, object]] = []
         base_prompt = self._read_system_prompt(settings.SYSTEM_PROMPT_PATH)
@@ -67,7 +71,7 @@ class AnthropicAgent:
             while True:
                 logger.info("Upstream API call started")
                 request: dict[str, object] = {
-                    "model": self._settings.ANTHROPIC_MODEL,
+                    "model": self._model.name,
                     "max_tokens": 4096,
                     "messages": self._messages,
                     "tools": self._tools,

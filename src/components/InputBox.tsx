@@ -1,42 +1,96 @@
 import { ChangeEvent, FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react'
-import type { ProjectFileEntry } from '@/types'
+import type { ModelSummary, ProjectFileEntry } from '@/types'
 
 interface InputBoxProps {
   disabled: boolean
   files: ProjectFileEntry[]
+  models: ModelSummary[]
   newSessionDisabled: boolean
+  onModelSelect: (modelName: string) => void
   onNewSession: () => void
   onSend: (content: string) => void
 }
 
-interface AtQuery {
+interface TextQuery {
   start: number
   end: number
   query: string
 }
 
+interface Suggestion {
+  key: string
+  icon: string
+  label: string
+  onSelect: () => void
+}
+
 const MAX_RESULTS = 30
 
-export default function InputBox({ disabled, files, newSessionDisabled, onNewSession, onSend }: InputBoxProps) {
+export default function InputBox({
+  disabled,
+  files,
+  models,
+  newSessionDisabled,
+  onModelSelect,
+  onNewSession,
+  onSend,
+}: InputBoxProps) {
   const [content, setContent] = useState('')
   const [cursor, setCursor] = useState(0)
   const [activeIndex, setActiveIndex] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const activeSuggestionRef = useRef<HTMLButtonElement>(null)
   const atQuery = findAtQuery(content, cursor)
-  const suggestions = atQuery ? filterFiles(files, atQuery.query) : []
+  const slashQuery = findSlashQuery(content, cursor)
+  const modelQuery = findModelQuery(content, cursor)
+  const suggestions = buildSuggestions()
 
   useEffect(() => {
     activeSuggestionRef.current?.scrollIntoView({ block: 'nearest' })
   }, [activeIndex])
 
+  function buildSuggestions(): Suggestion[] {
+    if (atQuery) {
+      return filterFiles(files, atQuery.query).map((entry) => ({
+        key: `file:${entry.absolutePath}`,
+        icon: entry.isDirectory ? '📁' : '📄',
+        label: entry.path,
+        onSelect: () => replaceQuery(atQuery, `@${entry.absolutePath} `),
+      }))
+    }
+    if (modelQuery) {
+      return models
+        .filter((model) => model.name.toLowerCase().includes(modelQuery.query))
+        .slice(0, MAX_RESULTS)
+        .map((model) => ({
+          key: `model:${model.name}`,
+          icon: '◆',
+          label: model.name,
+          onSelect: () => selectModel(model.name),
+        }))
+    }
+    if (slashQuery && 'model'.includes(slashQuery.query)) {
+      return [{
+        key: 'command:model',
+        icon: '/',
+        label: '/model',
+        onSelect: () => replaceQuery(slashQuery, '/model '),
+      }]
+    }
+    return []
+  }
+
   function send() {
     const value = content.trim()
     if (!value || disabled) return
+    if (value === '/model') return
+    if (value.startsWith('/model ')) {
+      const modelName = value.slice('/model '.length).trim()
+      if (models.some((model) => model.name === modelName)) selectModel(modelName)
+      return
+    }
     onSend(value)
-    setContent('')
-    setCursor(0)
-    resetHeight()
+    clearInput()
   }
 
   function submit(event: FormEvent) {
@@ -45,7 +99,7 @@ export default function InputBox({ disabled, files, newSessionDisabled, onNewSes
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (suggestions.length > 0 && atQuery) {
+    if (suggestions.length > 0) {
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault()
         const direction = event.key === 'ArrowDown' ? 1 : -1
@@ -54,7 +108,7 @@ export default function InputBox({ disabled, files, newSessionDisabled, onNewSes
       }
       if (event.key === 'Tab' || (event.key === 'Enter' && !event.shiftKey)) {
         event.preventDefault()
-        selectSuggestion(suggestions[activeIndex] ?? suggestions[0], atQuery)
+        ;(suggestions[activeIndex] ?? suggestions[0]).onSelect()
         return
       }
     }
@@ -77,8 +131,7 @@ export default function InputBox({ disabled, files, newSessionDisabled, onNewSes
     syncCursor()
   }
 
-  function selectSuggestion(entry: ProjectFileEntry, query: AtQuery) {
-    const replacement = `@${entry.absolutePath} `
+  function replaceQuery(query: TextQuery, replacement: string) {
     const nextContent = content.slice(0, query.start) + replacement + content.slice(query.end)
     const nextCursor = query.start + replacement.length
     setContent(nextContent)
@@ -91,6 +144,18 @@ export default function InputBox({ disabled, files, newSessionDisabled, onNewSes
       element.setSelectionRange(nextCursor, nextCursor)
       autoGrow(element)
     })
+  }
+
+  function selectModel(modelName: string) {
+    onModelSelect(modelName)
+    clearInput()
+  }
+
+  function clearInput() {
+    setContent('')
+    setCursor(0)
+    setActiveIndex(0)
+    resetHeight()
   }
 
   function syncCursor() {
@@ -119,21 +184,21 @@ export default function InputBox({ disabled, files, newSessionDisabled, onNewSes
         新对话
       </button>
       <div className="input-box__editor">
-        {suggestions.length > 0 && atQuery && (
+        {suggestions.length > 0 && (
           <div className="input-box__suggestions" role="listbox">
-            {suggestions.map((entry, index) => (
+            {suggestions.map((suggestion, index) => (
               <button
                 aria-selected={index === activeIndex}
                 className={index === activeIndex ? 'input-box__suggestion input-box__suggestion--active' : 'input-box__suggestion'}
-                key={entry.path}
+                key={suggestion.key}
                 onMouseDown={(event) => event.preventDefault()}
                 ref={index === activeIndex ? activeSuggestionRef : undefined}
-                onClick={() => selectSuggestion(entry, atQuery)}
+                onClick={suggestion.onSelect}
                 role="option"
                 type="button"
               >
-                <span>{entry.isDirectory ? '📁' : '📄'}</span>
-                <span>{entry.path}</span>
+                <span>{suggestion.icon}</span>
+                <span>{suggestion.label}</span>
               </button>
             ))}
           </div>
@@ -145,7 +210,7 @@ export default function InputBox({ disabled, files, newSessionDisabled, onNewSes
           onClick={syncCursor}
           onKeyDown={handleKeyDown}
           onKeyUp={handleKeyUp}
-          placeholder="输入消息，使用 @ 引用项目文件…"
+          placeholder="输入消息，使用 @ 引用文件或 / 执行命令…"
           ref={textareaRef}
           rows={1}
           value={content}
@@ -158,13 +223,26 @@ export default function InputBox({ disabled, files, newSessionDisabled, onNewSes
   )
 }
 
-function findAtQuery(content: string, cursor: number): AtQuery | null {
+function findAtQuery(content: string, cursor: number): TextQuery | null {
   const beforeCursor = content.slice(0, cursor)
   const start = beforeCursor.lastIndexOf('@')
   if (start < 0) return null
   const query = beforeCursor.slice(start + 1)
   if (/\s/.test(query)) return null
   return { start, end: cursor, query: query.toLowerCase() }
+}
+
+function findSlashQuery(content: string, cursor: number): TextQuery | null {
+  const beforeCursor = content.slice(0, cursor)
+  if (!beforeCursor.startsWith('/') || /\s/.test(beforeCursor)) return null
+  return { start: 0, end: cursor, query: beforeCursor.slice(1).toLowerCase() }
+}
+
+function findModelQuery(content: string, cursor: number): TextQuery | null {
+  const beforeCursor = content.slice(0, cursor)
+  const match = beforeCursor.match(/^\/model\s+(.*)$/i)
+  if (!match) return null
+  return { start: 0, end: cursor, query: match[1].trim().toLowerCase() }
 }
 
 function filterFiles(files: ProjectFileEntry[], query: string): ProjectFileEntry[] {

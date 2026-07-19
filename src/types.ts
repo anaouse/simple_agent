@@ -2,6 +2,15 @@ export interface Project {
   path: string
 }
 
+export interface ModelSummary {
+  name: string
+  compatible: string
+}
+
+export interface ModelListResponse {
+  models: ModelSummary[]
+}
+
 export interface ApiErrorResponse {
   error: ErrorBody
 }
