@@ -11,6 +11,7 @@ from loguru import logger
 from pydantic import ValidationError
 
 from app.ai.anthropic_agent import AnthropicAgent
+from app.ai.openai_agent import OpenAIAgent
 from app.config import get_agent_config, get_model_config, get_settings
 from app.project_files import ProjectFileIndex
 from app.session import ConversationSession
@@ -234,7 +235,7 @@ async def chat(
         return
     try:
         model_config = get_model_config(model)
-        if model_config.compatible != "anthropic":
+        if model_config.compatible not in ("anthropic", "openai"):
             raise ValueError
     except ValueError:
         await websocket.close(code=1008, reason="Invalid model")
@@ -253,7 +254,12 @@ async def chat(
             session.load(session_file)
     except (OSError, ValueError):
         logger.exception("Failed to load session for {}", resolved)
-    agent = AnthropicAgent(SETTINGS, model_config, resolved)
+    
+    # Create agent based on compatible field
+    if model_config.compatible == "openai":
+        agent = OpenAIAgent(SETTINGS, model_config, resolved)
+    else:
+        agent = AnthropicAgent(SETTINGS, model_config, resolved)
     agent.load_session(session.messages)
 
     try:
