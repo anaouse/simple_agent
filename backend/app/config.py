@@ -17,6 +17,7 @@ class ModelConfig(BaseModel):
 
 class AgentConfig(BaseModel):
     models: list[ModelConfig] = Field(min_length=1)
+    skills_path: Path | None = None
 
     @model_validator(mode="after")
     def validate_unique_model_names(self) -> "AgentConfig":

@@ -1,7 +1,5 @@
 from pathlib import Path
 
-from app.tools.security import ensure_in_project
-
 IGNORE_DIRS = {
     ".git",
     "__pycache__",
@@ -55,10 +53,6 @@ def walk(path: str) -> str:
     Args:
         path: Full absolute path to the directory, e.g. 'D:/projects/src' or '/home/user'
     """
-    error = ensure_in_project(path)
-    if error:
-        return error
-
     directory = Path(path)
     if not directory.exists():
         return f"Path does not exist: {path}"

@@ -1,10 +1,11 @@
 import { ChangeEvent, FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react'
-import type { ModelSummary, ProjectFileEntry } from '@/types'
+import type { ModelSummary, ProjectFileEntry, SkillEntry } from '@/types'
 
 interface InputBoxProps {
   disabled: boolean
   files: ProjectFileEntry[]
   models: ModelSummary[]
+  skills: SkillEntry[]
   newSessionDisabled: boolean
   onModelSelect: (modelName: string) => void
   onNewSession: () => void
@@ -30,6 +31,7 @@ export default function InputBox({
   disabled,
   files,
   models,
+  skills,
   newSessionDisabled,
   onModelSelect,
   onNewSession,
@@ -42,7 +44,8 @@ export default function InputBox({
   const activeSuggestionRef = useRef<HTMLButtonElement>(null)
   const atQuery = findAtQuery(content, cursor)
   const slashQuery = findSlashQuery(content, cursor)
-  const modelQuery = findModelQuery(content, cursor)
+  const modelQuery = findCommandQuery(content, cursor, 'model')
+  const skillQuery = findCommandQuery(content, cursor, 'skill')
   const suggestions = buildSuggestions()
 
   useEffect(() => {
@@ -69,13 +72,26 @@ export default function InputBox({
           onSelect: () => selectModel(model.name),
         }))
     }
-    if (slashQuery && 'model'.includes(slashQuery.query)) {
-      return [{
-        key: 'command:model',
-        icon: '/',
-        label: '/model',
-        onSelect: () => replaceQuery(slashQuery, '/model '),
-      }]
+    if (skillQuery) {
+      return skills
+        .filter((skill) => skill.name.toLowerCase().includes(skillQuery.query))
+        .slice(0, MAX_RESULTS)
+        .map((skill) => ({
+          key: `skill:${skill.name}`,
+          icon: '◆',
+          label: skill.name,
+          onSelect: () => replaceQuery(skillQuery, `/skill ${skill.name} `),
+        }))
+    }
+    if (slashQuery) {
+      return ['model', 'skill']
+        .filter((command) => command.includes(slashQuery.query))
+        .map((command) => ({
+          key: `command:${command}`,
+          icon: '/',
+          label: `/${command}`,
+          onSelect: () => replaceQuery(slashQuery, `/${command} `),
+        }))
     }
     return []
   }
@@ -83,7 +99,7 @@ export default function InputBox({
   function send() {
     const value = content.trim()
     if (!value || disabled) return
-    if (value === '/model') return
+    if (value === '/model' || value === '/skill') return
     if (value.startsWith('/model ')) {
       const modelName = value.slice('/model '.length).trim()
       if (models.some((model) => model.name === modelName)) selectModel(modelName)
@@ -238,9 +254,9 @@ function findSlashQuery(content: string, cursor: number): TextQuery | null {
   return { start: 0, end: cursor, query: beforeCursor.slice(1).toLowerCase() }
 }
 
-function findModelQuery(content: string, cursor: number): TextQuery | null {
+function findCommandQuery(content: string, cursor: number, command: string): TextQuery | null {
   const beforeCursor = content.slice(0, cursor)
-  const match = beforeCursor.match(/^\/model\s+(.*)$/i)
+  const match = beforeCursor.match(new RegExp(`^/${command}\\s+(.*)$`, 'i'))
   if (!match) return null
   return { start: 0, end: cursor, query: match[1].trim().toLowerCase() }
 }

@@ -9,11 +9,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
 from pydantic import ValidationError
+from watchfiles import Change, awatch
 
 from app.ai.anthropic_agent import AnthropicAgent
 from app.ai.openai_agent import OpenAIAgent
 from app.config import get_agent_config, get_model_config, get_settings
 from app.project_files import ProjectFileIndex
+from app.skill_files import SkillIndex
 from app.session import ConversationSession
 from app.models import (
     ApiModel,
@@ -34,8 +36,11 @@ from app.models import (
     SessionListResponse,
     SessionResponse,
     SessionSummary,
+    ModelsEvent,
+    SkillsEvent,
     ToolCallResultEvent,
     ToolCallStartEvent,
+    UserMessageEvent,
 )
 
 SETTINGS = get_settings()
@@ -98,6 +103,91 @@ async def list_models() -> ModelListResponse:
     )
 
 
+def model_event() -> ModelsEvent:
+    try:
+        models = [
+            ModelSummary(name=model.name, compatible=model.compatible)
+            for model in get_agent_config().models
+        ]
+    except (OSError, ValueError, ValidationError):
+        models = []
+    return ModelsEvent(models=models)
+
+
+def skills_root() -> Path | None:
+    try:
+        configured_path = get_agent_config().skills_path
+        if configured_path is None:
+            return None
+        resolved = configured_path.expanduser().resolve(strict=True)
+        return resolved if resolved.is_dir() else None
+    except (OSError, RuntimeError, ValueError, ValidationError):
+        return None
+
+
+def config_watch_filter(change: Change, changed_path: str) -> bool:
+    try:
+        return Path(changed_path).resolve() == SETTINGS.CONFIG_PATH.expanduser().resolve()
+    except (OSError, RuntimeError):
+        return False
+
+
+@app.websocket("/ws/models")
+async def models(websocket: WebSocket) -> None:
+    await websocket.accept()
+    config_path = SETTINGS.CONFIG_PATH.expanduser()
+    changes = awatch(config_path.parent, watch_filter=config_watch_filter)
+    try:
+        await send_event(websocket, model_event())
+        while True:
+            change_task = asyncio.create_task(anext(changes))
+            disconnect_task = asyncio.create_task(websocket.receive_text())
+            done, pending = await asyncio.wait(
+                {change_task, disconnect_task}, return_when=asyncio.FIRST_COMPLETED
+            )
+            for task in pending:
+                task.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
+            if disconnect_task in done:
+                disconnect_task.result()
+                continue
+            await send_event(websocket, model_event())
+    except WebSocketDisconnect:
+        logger.info("Models WebSocket disconnected")
+    finally:
+        await changes.aclose()
+
+
+@app.websocket("/ws/skills")
+async def skills(websocket: WebSocket) -> None:
+    await websocket.accept()
+    index = SkillIndex(skills_root())
+    try:
+        await send_event(websocket, index.event())
+        while True:
+            paths = [SETTINGS.CONFIG_PATH.expanduser().parent]
+            if index.root is not None:
+                paths.append(index.root)
+            changes = awatch(*paths)
+            try:
+                change_task = asyncio.create_task(anext(changes))
+                disconnect_task = asyncio.create_task(websocket.receive_text())
+                done, pending = await asyncio.wait(
+                    {change_task, disconnect_task}, return_when=asyncio.FIRST_COMPLETED
+                )
+                for task in pending:
+                    task.cancel()
+                await asyncio.gather(*pending, return_exceptions=True)
+                if disconnect_task in done:
+                    disconnect_task.result()
+                    continue
+                await send_event(websocket, index.refresh(skills_root()))
+            finally:
+                await changes.aclose()
+    except WebSocketDisconnect:
+        logger.info("Skills WebSocket disconnected")
+
+
 @app.post("/api/projects")
 async def create_project(request: ProjectRequest) -> ProjectResponse:
     raw_path = request.path.strip()
@@ -158,6 +248,24 @@ async def open_session(request: OpenSessionRequest) -> SessionResponse:
     messages = session.load(request.session_file)
     logger.info("Session opened: {}", session.file_name)
     return SessionResponse(session_file=session.file_name, messages=messages)
+
+
+def resolve_skill_message(content: str) -> str:
+    command, separator, question = content.partition(" ")
+    if command != "/skill" or not separator:
+        return content
+    skill_name, separator, question = question.strip().partition(" ")
+    root = skills_root()
+    if not skill_name or not separator or root is None:
+        return content
+    skill_directory = root / skill_name
+    skill_file = skill_directory / "SKILL.md"
+    if not skill_directory.is_dir() or not skill_file.is_file():
+        return content
+    return (
+        f"请你阅读 `{skill_file.as_posix()}` 然后结合这个文件夹下的提示理解接下来的问题："
+        f"{question.strip()}"
+    )
 
 
 async def interrupt_active_chat(project_path: Path) -> None:
@@ -278,16 +386,21 @@ async def chat(
                 continue
 
             logger.info("User message received")
+            content = resolve_skill_message(message.content)
             message_id = str(uuid4())
             created_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
-            session.append_user(message.content)
+            session.append_user(content)
+            await send_event(
+                websocket,
+                UserMessageEvent(content=content, created_at=created_at),
+            )
             await send_event(
                 websocket,
                 MessageStartEvent(message_id=message_id, created_at=created_at),
             )
 
             try:
-                async for event in agent.reply(message.content):
+                async for event in agent.reply(content):
                     if event["type"] == "content_delta":
                         session.append_delta(message_id, event["delta"], created_at)
                         await send_event(

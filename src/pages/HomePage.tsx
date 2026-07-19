@@ -7,8 +7,8 @@ import SessionInfo from '@/components/SessionInfo'
 import type {
   ChatMessage,
   ClientMessage,
-  ModelListResponse,
   ModelSummary,
+  ModelsEvent,
   NewSessionRequest,
   NewSessionResponse,
   OpenSessionRequest,
@@ -16,6 +16,8 @@ import type {
   ProjectFileEntry,
   ProjectFilesEvent,
   ServerEvent,
+  SkillEntry,
+  SkillsEvent,
   SessionResponse,
 } from '@/types'
 
@@ -23,6 +25,8 @@ const BACKEND_PORT = import.meta.env.VITE_BACKEND_PORT || '2453'
 const API_BASE_URL = `${location.protocol}//${location.hostname}:${BACKEND_PORT}/api`
 const WS_BASE_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:${BACKEND_PORT}/ws/chat`
 const FILES_WS_BASE_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:${BACKEND_PORT}/ws/project-files`
+const MODELS_WS_BASE_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:${BACKEND_PORT}/ws/models`
+const SKILLS_WS_BASE_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:${BACKEND_PORT}/ws/skills`
 const PROJECTS_STORAGE_KEY = 'agent-projects'
 
 function loadProjects(): Project[] {
@@ -45,6 +49,7 @@ export default function HomePage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [models, setModels] = useState<ModelSummary[]>([])
+  const [skills, setSkills] = useState<SkillEntry[]>([])
   const [activeModelName, setActiveModelName] = useState<string | null>(null)
   const [projectFiles, setProjectFiles] = useState<ProjectFileEntry[]>([])
   const [connected, setConnected] = useState(false)
@@ -55,13 +60,30 @@ export default function HomePage() {
   const messageCreatedAtRef = useRef(new Map<string, string>())
 
   useEffect(() => {
-    axios.get<ModelListResponse>(`${API_BASE_URL}/models`).then((response) => {
-      setModels(response.data.models)
-      setActiveModelName(response.data.models[0]?.name ?? null)
-    }).catch(() => {
+    const socket = new WebSocket(MODELS_WS_BASE_URL)
+    socket.onmessage = (message) => {
+      const event = JSON.parse(message.data) as ModelsEvent
+      if (event.type !== 'models') return
+      setModels(event.models)
+      setActiveModelName((current) => event.models.some((model) => model.name === current)
+        ? current
+        : event.models[0]?.name ?? null)
+    }
+    socket.onclose = () => {
       setModels([])
       setActiveModelName(null)
-    })
+    }
+    return () => socket.close()
+  }, [])
+
+  useEffect(() => {
+    const socket = new WebSocket(SKILLS_WS_BASE_URL)
+    socket.onmessage = (message) => {
+      const event = JSON.parse(message.data) as SkillsEvent
+      if (event.type === 'skills') setSkills(event.entries)
+    }
+    socket.onclose = () => setSkills([])
+    return () => socket.close()
   }, [])
 
   useEffect(() => {
@@ -161,6 +183,16 @@ export default function HomePage() {
   }
 
   function handleEvent(event: ServerEvent) {
+    if (event.type === 'user_message') {
+      setMessages((current) => [...current, {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content: event.content,
+        status: 'complete',
+        createdAt: event.createdAt,
+      }])
+      return
+    }
     if (event.type === 'message_start') {
       activeMessageIdRef.current = event.messageId
       messageCreatedAtRef.current.set(event.messageId, event.createdAt)
@@ -271,13 +303,6 @@ export default function HomePage() {
     const socket = socketRef.current
     if (!socket || socket.readyState !== WebSocket.OPEN || !activePath) return
     const message: ClientMessage = { type: 'message', content }
-    setMessages((current) => [...current, {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content,
-      status: 'complete',
-      createdAt: new Date().toISOString(),
-    }])
     setWaiting(true)
     socket.send(JSON.stringify(message))
   }
@@ -306,6 +331,7 @@ export default function HomePage() {
           disabled={!activePath || !connected || waiting || startingSession}
           files={projectFiles}
           models={models}
+          skills={skills}
           newSessionDisabled={!activePath || startingSession}
           onModelSelect={selectModel}
           onNewSession={startNewSession}

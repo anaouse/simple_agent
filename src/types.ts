@@ -11,6 +11,20 @@ export interface ModelListResponse {
   models: ModelSummary[]
 }
 
+export interface ModelsEvent {
+  type: 'models'
+  models: ModelSummary[]
+}
+
+export interface SkillEntry {
+  name: string
+}
+
+export interface SkillsEvent {
+  type: 'skills'
+  entries: SkillEntry[]
+}
+
 export interface ApiErrorResponse {
   error: ErrorBody
 }
@@ -83,6 +97,12 @@ export interface NewSessionResponse {
   sessionFile: string
 }
 
+export interface UserMessageEvent {
+  type: 'user_message'
+  content: string
+  createdAt: string
+}
+
 export interface MessageStartEvent {
   type: 'message_start'
   messageId: string
@@ -127,6 +147,7 @@ export interface ErrorEvent {
 }
 
 export type ServerEvent =
+  | UserMessageEvent
   | MessageStartEvent
   | ContentDeltaEvent
   | ToolCallStartEvent

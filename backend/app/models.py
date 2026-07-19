@@ -23,6 +23,20 @@ class ModelListResponse(ApiModel):
     models: list[ModelSummary]
 
 
+class ModelsEvent(ApiModel):
+    type: Literal["models"] = "models"
+    models: list[ModelSummary]
+
+
+class SkillEntry(ApiModel):
+    name: str
+
+
+class SkillsEvent(ApiModel):
+    type: Literal["skills"] = "skills"
+    entries: list[SkillEntry]
+
+
 class ProjectRequest(ApiModel):
     path: str = Field(min_length=1, max_length=4096)
 
@@ -94,6 +108,12 @@ class OpenSessionRequest(SessionRequest):
 class NewSessionResponse(ApiModel):
     project_path: str
     session_file: str
+
+
+class UserMessageEvent(ApiModel):
+    type: Literal["user_message"] = "user_message"
+    content: str
+    created_at: str
 
 
 class MessageStartEvent(ApiModel):
