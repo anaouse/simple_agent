@@ -60,6 +60,7 @@ class AnthropicAgent:
             base_url=model.url,
         )
         self._messages: list[dict[str, object]] = []
+        self._total_token = 0
         base_prompt = self._read_system_prompt(config.system_prompt_path)
         self._system_prompt = self._build_system_prompt(base_prompt)
         self._tools, self._tool_functions = tools_from_functions(
@@ -78,7 +79,7 @@ class AnthropicAgent:
                 logger.info("Upstream API call started")
                 request: dict[str, object] = {
                     "model": self._model.name,
-                    "max_tokens": 4096,
+                    "max_tokens": 16384,
                     "messages": self._messages,
                     "tools": self._tools,
                 }
@@ -102,6 +103,9 @@ class AnthropicAgent:
                     final_message = await stream.get_final_message()
 
                 logger.info("Upstream API call completed")
+                self._total_token = (
+                    final_message.usage.input_tokens + final_message.usage.output_tokens
+                )
                 assistant_message = self._message_to_dict(final_message)
                 self._messages.append(assistant_message)
 
@@ -116,6 +120,9 @@ class AnthropicAgent:
         except Exception:
             logger.exception("Agent reply failed")
             raise
+
+    def get_total_token(self) -> int:
+        return self._total_token
 
     async def _execute_tools(
         self, assistant_message: dict[str, object]

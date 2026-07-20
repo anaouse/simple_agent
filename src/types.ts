@@ -72,6 +72,7 @@ export interface ProjectFilesEvent {
 
 export interface SessionResponse {
   sessionFile: string | null
+  totalToken: number
   messages: ChatMessage[]
 }
 
@@ -149,6 +150,7 @@ export interface ToolCallResultEvent {
 export interface MessageEndEvent {
   type: 'message_end'
   messageId: string
+  totalToken: number
 }
 
 export interface ErrorBody {

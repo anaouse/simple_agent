@@ -82,7 +82,13 @@ CHAT_MESSAGE_ADAPTER = TypeAdapter(ChatMessage)
 
 class SessionResponse(ApiModel):
     session_file: str | None = None
+    total_token: int = 0
     messages: list[TextChatMessage | ToolChatMessage]
+
+
+class SessionStorage(ApiModel):
+    total_token: int = 0
+    messages: list[TextChatMessage | ToolChatMessage] = Field(default_factory=list)
 
 
 class SessionSummary(ApiModel):
@@ -139,6 +145,7 @@ class ContentDeltaEvent(ApiModel):
 class MessageEndEvent(ApiModel):
     type: Literal["message_end"] = "message_end"
     message_id: str
+    total_token: int
 
 
 class ToolCallStartEvent(ApiModel):

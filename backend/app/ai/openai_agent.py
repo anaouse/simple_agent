@@ -60,6 +60,7 @@ class OpenAIAgent:
             base_url=model.url,
         )
         self._messages: list[dict[str, object]] = []
+        self._total_token = 0
         base_prompt = self._read_system_prompt(config.system_prompt_path)
         self._system_prompt = self._build_system_prompt(base_prompt)
         self._tools = self._build_openai_tools()
@@ -88,6 +89,7 @@ class OpenAIAgent:
                     "messages": self._messages,
                     "tools": self._tools,
                     "stream": True,
+                    "stream_options": {"include_usage": True},
                 }
 
                 # Add system prompt as first message if exists
@@ -106,6 +108,10 @@ class OpenAIAgent:
                 started_tool_calls: set[int] = set()
 
                 async for chunk in stream:
+                    if chunk.usage is not None:
+                        self._total_token = (
+                            chunk.usage.prompt_tokens + chunk.usage.completion_tokens
+                        )
                     if not chunk.choices:
                         continue
 
@@ -186,6 +192,9 @@ class OpenAIAgent:
         except Exception:
             logger.exception("Agent reply failed")
             raise
+
+    def get_total_token(self) -> int:
+        return self._total_token
 
     async def _execute_tools(
         self, tool_calls_data: dict[int, dict[str, object]]

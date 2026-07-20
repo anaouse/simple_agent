@@ -49,6 +49,7 @@ export default function HomePage() {
   const [sessionRefreshVersion, setSessionRefreshVersion] = useState(0)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [totalToken, setTotalToken] = useState(0)
   const [models, setModels] = useState<ModelSummary[]>([])
   const [skills, setSkills] = useState<SkillEntry[]>([])
   const [activeModelName, setActiveModelName] = useState<string | null>(null)
@@ -145,6 +146,7 @@ export default function HomePage() {
       })
     }
     setMessages([])
+    setTotalToken(0)
     activeMessageIdRef.current = null
     messageCreatedAtRef.current.clear()
     setActivePath(path)
@@ -154,10 +156,12 @@ export default function HomePage() {
         params: { project_path: path },
       })
       setMessages(response.data.messages)
+      setTotalToken(response.data.totalToken)
       sessionFile = response.data.sessionFile
       setActiveSessionFile(sessionFile)
     } catch {
       setMessages([])
+      setTotalToken(0)
       setActiveSessionFile(null)
     }
     connect(path, sessionFile)
@@ -171,6 +175,7 @@ export default function HomePage() {
     setActivePath(path)
     setActiveSessionFile(response.data.sessionFile)
     setMessages(response.data.messages)
+    setTotalToken(response.data.totalToken)
     setWaiting(false)
     activeMessageIdRef.current = null
     messageCreatedAtRef.current.clear()
@@ -191,6 +196,7 @@ export default function HomePage() {
       setActivePath(null)
       setActiveSessionFile(null)
       setMessages([])
+      setTotalToken(0)
       setWaiting(false)
       activeMessageIdRef.current = null
       messageCreatedAtRef.current.clear()
@@ -266,6 +272,7 @@ export default function HomePage() {
         : item))
       messageCreatedAtRef.current.delete(event.messageId)
       activeMessageIdRef.current = null
+      setTotalToken(event.totalToken)
       setWaiting(false)
       return
     }
@@ -303,6 +310,7 @@ export default function HomePage() {
       const response = await axios.post<NewSessionResponse>(`${API_BASE_URL}/sessions`, request)
       socketRef.current?.close()
       setMessages([])
+      setTotalToken(0)
       setActiveSessionFile(response.data.sessionFile)
       setSessionRefreshVersion((current) => current + 1)
       setWaiting(false)
@@ -371,7 +379,7 @@ export default function HomePage() {
           <span>{activePath ? (connected ? '已连接' : '连接中…') : '未选择项目'}</span>
         </header>
         <MessageArea messages={messages} />
-        <SessionInfo modelName={activeModelName} messages={messages} />
+        <SessionInfo modelName={activeModelName} totalToken={totalToken} />
         <InputBox
           disabled={!activePath || !connected || responding || startingSession}
           files={projectFiles}

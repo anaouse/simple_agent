@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from loguru import logger
 
-from app.models import CHAT_MESSAGE_ADAPTER, ChatMessage, TextChatMessage, ToolChatMessage
+from app.models import CHAT_MESSAGE_ADAPTER, ChatMessage, SessionStorage, TextChatMessage, ToolChatMessage
 
 _INTERRUPTED_TEXT = "\n\n[用户中断了本次回答]"
 _INTERRUPTED_RESULT = "用户中断"
@@ -20,6 +20,7 @@ class ConversationSession:
         self._directory = data_dir.expanduser().resolve() / project_key
         self._path: Path | None = None
         self._dirty = False
+        self.total_token = 0
         self.messages: list[ChatMessage] = []
 
     @property
@@ -52,7 +53,13 @@ class ConversationSession:
             raise ValueError("Session file does not exist")
         self._path = path
         data = json.loads(path.read_text(encoding="utf-8"))
-        self.messages = [CHAT_MESSAGE_ADAPTER.validate_python(item) for item in data]
+        if isinstance(data, list):
+            self.messages = [CHAT_MESSAGE_ADAPTER.validate_python(item) for item in data]
+            self.total_token = 0
+        else:
+            storage = SessionStorage.model_validate(data)
+            self.messages = storage.messages
+            self.total_token = storage.total_token
         self._dirty = False
         return self.messages
 
@@ -66,8 +73,9 @@ class ConversationSession:
                 data = json.loads(latest_path.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 data = None
-            if data == []:
+            if data == [] or data == {"totalToken": 0, "messages": []}:
                 self._path = latest_path
+                self.total_token = 0
                 self.messages = []
                 self._dirty = False
                 logger.info("Reused empty session: {}", self._path)
@@ -75,10 +83,17 @@ class ConversationSession:
 
         self._directory.mkdir(parents=True, exist_ok=True)
         self._path = self._next_path()
-        self._path.write_text("[]", encoding="utf-8")
+        self._path.write_text(
+            '{\n  "totalToken": 0,\n  "messages": []\n}', encoding="utf-8"
+        )
+        self.total_token = 0
         self.messages = []
         self._dirty = False
         logger.info("Session created: {}", self._path)
+
+    def update_total_token(self, total_token: int) -> None:
+        self.total_token = total_token
+        self._dirty = True
 
     def append_user(self, content: str) -> None:
         self._dirty = True
@@ -179,9 +194,10 @@ class ConversationSession:
         self._directory.mkdir(parents=True, exist_ok=True)
         if self._path is None:
             self._path = self._next_path()
+        storage = SessionStorage(total_token=self.total_token, messages=self.messages)
         self._path.write_text(
             json.dumps(
-                [message.model_dump(by_alias=True) for message in self.messages],
+                storage.model_dump(by_alias=True),
                 ensure_ascii=False,
                 indent=2,
             ),

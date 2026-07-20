@@ -248,7 +248,11 @@ async def get_current_session(project_path: str) -> SessionResponse:
     except (OSError, ValueError):
         logger.exception("Failed to load session for {}", resolved)
         messages = []
-    return SessionResponse(session_file=session.file_name, messages=messages)
+    return SessionResponse(
+        session_file=session.file_name,
+        total_token=session.total_token,
+        messages=messages,
+    )
 
 
 @app.post("/api/sessions/open")
@@ -258,7 +262,11 @@ async def open_session(request: OpenSessionRequest) -> SessionResponse:
     session = ConversationSession(get_agent_config().data_dir, resolved)
     messages = session.load(request.session_file)
     logger.info("Session opened: {}", session.file_name)
-    return SessionResponse(session_file=session.file_name, messages=messages)
+    return SessionResponse(
+        session_file=session.file_name,
+        total_token=session.total_token,
+        messages=messages,
+    )
 
 
 def resolve_skill_message(content: str) -> str:
@@ -463,8 +471,15 @@ async def chat(
                             ),
                         )
                 session.finish_message(message_id)
+                session.update_total_token(agent.get_total_token())
                 session.save()
-                await send_event(websocket, MessageEndEvent(message_id=message_id))
+                await send_event(
+                    websocket,
+                    MessageEndEvent(
+                        message_id=message_id,
+                        total_token=session.total_token,
+                    ),
+                )
             except WebSocketDisconnect:
                 raise
             except Exception:
