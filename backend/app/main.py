@@ -25,6 +25,8 @@ from app.models import (
     ErrorEvent,
     ErrorResponse,
     MessageEndEvent,
+    InterruptSessionRequest,
+    InterruptSessionResponse,
     MessageStartEvent,
     ModelListResponse,
     ModelSummary,
@@ -217,6 +219,15 @@ async def create_session(request: NewSessionRequest) -> NewSessionResponse:
     return NewSessionResponse(
         project_path=resolved.as_posix(), session_file=session.file_name or ""
     )
+
+
+@app.post("/api/sessions/interrupt")
+async def interrupt_session(request: InterruptSessionRequest) -> InterruptSessionResponse:
+    resolved = resolve_project_path(request.project_path)
+    active_chat = ACTIVE_CHATS.get(resolved.as_posix())
+    interrupted = active_chat is not None and not active_chat.done()
+    await interrupt_active_chat(resolved)
+    return InterruptSessionResponse(interrupted=interrupted)
 
 
 @app.get("/api/sessions")

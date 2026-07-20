@@ -7,9 +7,11 @@ interface InputBoxProps {
   models: ModelSummary[]
   skills: SkillEntry[]
   newSessionDisabled: boolean
+  waiting: boolean
   onModelSelect: (modelName: string) => void
   onNewSession: () => void
   onSend: (content: string) => void
+  onStop: () => void
 }
 
 interface TextQuery {
@@ -33,9 +35,11 @@ export default function InputBox({
   models,
   skills,
   newSessionDisabled,
+  waiting,
   onModelSelect,
   onNewSession,
   onSend,
+  onStop,
 }: InputBoxProps) {
   const [content, setContent] = useState('')
   const [cursor, setCursor] = useState(0)
@@ -232,9 +236,15 @@ export default function InputBox({
           value={content}
         />
       </div>
-      <button disabled={disabled || !content.trim()} type="submit">
-        发送
-      </button>
+      {waiting ? (
+        <button onClick={onStop} type="button">
+          停止
+        </button>
+      ) : (
+        <button disabled={disabled || !content.trim()} type="submit">
+          发送
+        </button>
+      )}
     </form>
   )
 }

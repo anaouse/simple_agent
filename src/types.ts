@@ -97,6 +97,14 @@ export interface NewSessionResponse {
   sessionFile: string
 }
 
+export interface InterruptSessionRequest {
+  projectPath: string
+}
+
+export interface InterruptSessionResponse {
+  interrupted: boolean
+}
+
 export interface UserMessageEvent {
   type: 'user_message'
   content: string

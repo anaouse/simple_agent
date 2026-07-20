@@ -101,6 +101,14 @@ class NewSessionRequest(SessionRequest):
     pass
 
 
+class InterruptSessionRequest(SessionRequest):
+    pass
+
+
+class InterruptSessionResponse(ApiModel):
+    interrupted: bool
+
+
 class OpenSessionRequest(SessionRequest):
     session_file: str = Field(min_length=6, max_length=255)
 

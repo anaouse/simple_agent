@@ -8,6 +8,7 @@ import type {
   ChatMessage,
   ClientMessage,
   ModelSummary,
+  InterruptSessionRequest,
   ModelsEvent,
   NewSessionRequest,
   NewSessionResponse,
@@ -299,6 +300,29 @@ export default function HomePage() {
     if (activePath) connect(activePath, activeSessionFile, modelName)
   }
 
+  const responding = waiting || messages.some((message) => message.status === 'streaming')
+
+  async function stop() {
+    if (!activePath || !responding) return
+    const request: InterruptSessionRequest = { projectPath: activePath }
+    await axios.post(`${API_BASE_URL}/sessions/interrupt`, request)
+    setMessages((current) => current.map((message) => {
+      if (message.status !== 'streaming') return message
+      if (message.role === 'tool') {
+        return { ...message, result: message.result || '用户中断', status: 'error' as const }
+      }
+      return {
+        ...message,
+        content: `${message.content}\n\n[用户中断了本次回答]`,
+        status: 'error' as const,
+      }
+    }))
+    setWaiting(false)
+    activeMessageIdRef.current = null
+    messageCreatedAtRef.current.clear()
+    connect(activePath, activeSessionFile)
+  }
+
   function send(content: string) {
     const socket = socketRef.current
     if (!socket || socket.readyState !== WebSocket.OPEN || !activePath) return
@@ -328,14 +352,16 @@ export default function HomePage() {
         <MessageArea messages={messages} />
         <SessionInfo modelName={activeModelName} />
         <InputBox
-          disabled={!activePath || !connected || waiting || startingSession}
+          disabled={!activePath || !connected || responding || startingSession}
           files={projectFiles}
           models={models}
           skills={skills}
           newSessionDisabled={!activePath || startingSession}
+          waiting={responding}
           onModelSelect={selectModel}
           onNewSession={startNewSession}
           onSend={send}
+          onStop={stop}
         />
       </div>
     </div>
