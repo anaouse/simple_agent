@@ -6,7 +6,7 @@ from anthropic import AsyncAnthropic
 from loguru import logger
 
 from app.ai.anthropic_session_adaptor import AnthropicSessionAdaptor
-from app.config import ModelConfig, Settings
+from app.config import AgentConfig, ModelConfig
 from app.models import ChatMessage
 from app.tools import bash, edit, read, walk, write
 from app.tools.security import set_project_root
@@ -25,6 +25,12 @@ class ToolCallStart(TypedDict):
     arguments: dict[str, object]
 
 
+class ToolCallArguments(TypedDict):
+    type: Literal["tool_call_arguments"]
+    tool_call_id: str
+    arguments: dict[str, object]
+
+
 class ToolCallResult(TypedDict):
     type: Literal["tool_call_result"]
     tool_call_id: str
@@ -37,12 +43,12 @@ class InternalToolResultEvent(TypedDict):
     message: dict[str, object]
 
 
-AgentEvent = ContentDelta | ToolCallStart | ToolCallResult
+AgentEvent = ContentDelta | ToolCallStart | ToolCallArguments | ToolCallResult
 
 
 class AnthropicAgent:
     def __init__(
-        self, settings: Settings, model: ModelConfig, project_path: Path
+        self, config: AgentConfig, model: ModelConfig, project_path: Path
     ) -> None:
         if model.compatible != "anthropic":
             raise ValueError(f"暂不支持的模型兼容格式: {model.compatible}")
@@ -54,7 +60,7 @@ class AnthropicAgent:
             base_url=model.url,
         )
         self._messages: list[dict[str, object]] = []
-        base_prompt = self._read_system_prompt(settings.SYSTEM_PROMPT_PATH)
+        base_prompt = self._read_system_prompt(config.system_prompt_path)
         self._system_prompt = self._build_system_prompt(base_prompt)
         self._tools, self._tool_functions = tools_from_functions(
             [read, write, edit, walk, bash]
@@ -81,9 +87,17 @@ class AnthropicAgent:
 
                 async with self._client.messages.stream(**request) as stream:
                     async for event in stream:
-                        if event.type != "content_block_delta":
-                            continue
-                        if event.delta.type == "text_delta":
+                        if event.type == "content_block_start" and event.content_block.type == "tool_use":
+                            logger.info(
+                                "Tool call arguments started: {}", event.content_block.name
+                            )
+                            yield {
+                                "type": "tool_call_start",
+                                "tool_call_id": event.content_block.id,
+                                "tool_name": event.content_block.name,
+                                "arguments": {},
+                            }
+                        elif event.type == "content_block_delta" and event.delta.type == "text_delta":
                             yield {"type": "content_delta", "delta": event.delta.text}
                     final_message = await stream.get_final_message()
 
@@ -119,14 +133,14 @@ class AnthropicAgent:
             tool_name = str(block.get("name", ""))
             tool_input = block.get("input", {})
             function = self._tool_functions.get(tool_name)
-            logger.info("Tool call started: {}", tool_name)
             arguments = tool_input if isinstance(tool_input, dict) else {}
+            logger.info("Tool call arguments completed: {} | {}", tool_name, arguments)
             yield {
-                "type": "tool_call_start",
+                "type": "tool_call_arguments",
                 "tool_call_id": tool_use_id,
-                "tool_name": tool_name,
                 "arguments": arguments,
             }
+            logger.info("Tool call execution started: {}", tool_name)
 
             is_error = False
             if function is None:
@@ -144,7 +158,7 @@ class AnthropicAgent:
                     result = f"Error executing tool '{tool_name}': {exception}"
                     is_error = True
 
-            logger.info("Tool call completed: {}", tool_name)
+            logger.info("Tool call execution completed: {}", tool_name)
             yield {
                 "type": "tool_call_result",
                 "tool_call_id": tool_use_id,

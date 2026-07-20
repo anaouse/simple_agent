@@ -234,6 +234,12 @@ export default function HomePage() {
       ])
       return
     }
+    if (event.type === 'tool_call_arguments') {
+      setMessages((current) => current.map((item) => item.role === 'tool' && item.id === event.toolCallId
+        ? { ...item, arguments: event.arguments }
+        : item))
+      return
+    }
     if (event.type === 'tool_call_result') {
       setMessages((current) => current.map((item) => item.role === 'tool' && item.id === event.toolCallId
         ? { ...item, result: event.result, status: event.isError ? 'error' : 'complete' }

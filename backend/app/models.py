@@ -149,6 +149,13 @@ class ToolCallStartEvent(ApiModel):
     arguments: dict[str, JsonValue]
 
 
+class ToolCallArgumentsEvent(ApiModel):
+    type: Literal["tool_call_arguments"] = "tool_call_arguments"
+    message_id: str
+    tool_call_id: str
+    arguments: dict[str, JsonValue]
+
+
 class ToolCallResultEvent(ApiModel):
     type: Literal["tool_call_result"] = "tool_call_result"
     message_id: str

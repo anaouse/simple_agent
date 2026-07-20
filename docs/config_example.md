@@ -20,6 +20,8 @@
       "compatible": "openai"
     }
   ],
+  "system_prompt_path": "D:/projects/agent/docs/system_prompt.md",
+  "data_dir": "D:/projects/agent/data",
   "skills_path": "~/.simple_agent/skills"
 }
 ```
@@ -35,6 +37,8 @@
 - `compatible`: API 格式类型
   - `anthropic`: 使用 Anthropic 的 API 格式
   - `openai`: 使用 OpenAI 的 API 格式
+- `system_prompt_path`: 可选，系统提示词文件路径。
+- `data_dir`: 会话数据存储目录。
 - `skills_path`: 可选，存放 skill 文件夹的路径。其第一层子文件夹中直接包含 `SKILL.md` 时，该文件夹会作为一个 skill 显示在 `/skill` 候选列表中。
 
 ## 支持的格式

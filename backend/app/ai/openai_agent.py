@@ -7,7 +7,7 @@ from loguru import logger
 from openai import AsyncOpenAI
 
 from app.ai.openai_session_adaptor import OpenAISessionAdaptor
-from app.config import ModelConfig, Settings
+from app.config import AgentConfig, ModelConfig
 from app.models import ChatMessage
 from app.tools import bash, edit, read, walk, write
 from app.tools.security import set_project_root
@@ -25,6 +25,12 @@ class ToolCallStart(TypedDict):
     arguments: dict[str, object]
 
 
+class ToolCallArguments(TypedDict):
+    type: Literal["tool_call_arguments"]
+    tool_call_id: str
+    arguments: dict[str, object]
+
+
 class ToolCallResult(TypedDict):
     type: Literal["tool_call_result"]
     tool_call_id: str
@@ -37,12 +43,12 @@ class InternalToolResultEvent(TypedDict):
     message: dict[str, object]
 
 
-AgentEvent = ContentDelta | ToolCallStart | ToolCallResult
+AgentEvent = ContentDelta | ToolCallStart | ToolCallArguments | ToolCallResult
 
 
 class OpenAIAgent:
     def __init__(
-        self, settings: Settings, model: ModelConfig, project_path: Path
+        self, config: AgentConfig, model: ModelConfig, project_path: Path
     ) -> None:
         if model.compatible != "openai":
             raise ValueError(f"暂不支持的模型兼容格式: {model.compatible}")
@@ -54,7 +60,7 @@ class OpenAIAgent:
             base_url=model.url,
         )
         self._messages: list[dict[str, object]] = []
-        base_prompt = self._read_system_prompt(settings.SYSTEM_PROMPT_PATH)
+        base_prompt = self._read_system_prompt(config.system_prompt_path)
         self._system_prompt = self._build_system_prompt(base_prompt)
         self._tools = self._build_openai_tools()
         self._tool_functions: dict[str, Callable[..., str]] = {
@@ -97,6 +103,7 @@ class OpenAIAgent:
                 # Collect streaming response
                 assistant_content = ""
                 tool_calls_data: dict[int, dict[str, object]] = {}
+                started_tool_calls: set[int] = set()
 
                 async for chunk in stream:
                     if not chunk.choices:
@@ -135,6 +142,17 @@ class OpenAIAgent:
 
                                 if tool_call.function.name:
                                     function["name"] = tool_call.function.name
+                                    if index not in started_tool_calls:
+                                        started_tool_calls.add(index)
+                                        tool_name = tool_call.function.name
+                                        tool_id = str(tool_calls_data[index].get("id", ""))
+                                        logger.info("Tool call arguments started: {}", tool_name)
+                                        yield {
+                                            "type": "tool_call_start",
+                                            "tool_call_id": tool_id,
+                                            "tool_name": tool_name,
+                                            "arguments": {},
+                                        }
 
                                 if tool_call.function.arguments:
                                     function["arguments"] = (
@@ -190,14 +208,14 @@ class OpenAIAgent:
                 arguments = {}
 
             function = self._tool_functions.get(tool_name)
-            logger.info("Tool call started: {}", tool_name)
-
+            parsed_arguments = arguments if isinstance(arguments, dict) else {}
+            logger.info("Tool call arguments completed: {} | {}", tool_name, parsed_arguments)
             yield {
-                "type": "tool_call_start",
+                "type": "tool_call_arguments",
                 "tool_call_id": tool_id,
-                "tool_name": tool_name,
-                "arguments": arguments if isinstance(arguments, dict) else {},
+                "arguments": parsed_arguments,
             }
+            logger.info("Tool call execution started: {}", tool_name)
 
             is_error = False
             if function is None:
@@ -215,7 +233,7 @@ class OpenAIAgent:
                     result = f"Error executing tool '{tool_name}': {exception}"
                     is_error = True
 
-            logger.info("Tool call completed: {}", tool_name)
+            logger.info("Tool call execution completed: {}", tool_name)
             yield {
                 "type": "tool_call_result",
                 "tool_call_id": tool_id,

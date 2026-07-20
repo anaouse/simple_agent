@@ -13,7 +13,7 @@ from watchfiles import Change, awatch
 
 from app.ai.anthropic_agent import AnthropicAgent
 from app.ai.openai_agent import OpenAIAgent
-from app.config import get_agent_config, get_model_config, get_settings
+from app.config import CONFIG_PATH, get_agent_config, get_model_config
 from app.project_files import ProjectFileIndex
 from app.skill_files import SkillIndex
 from app.session import ConversationSession
@@ -40,14 +40,14 @@ from app.models import (
     SessionSummary,
     ModelsEvent,
     SkillsEvent,
+    ToolCallArgumentsEvent,
     ToolCallResultEvent,
     ToolCallStartEvent,
     UserMessageEvent,
 )
 
-SETTINGS = get_settings()
 ACTIVE_CHATS: dict[str, asyncio.Task[None]] = {}
-app = FastAPI(title=SETTINGS.APP_NAME)
+app = FastAPI(title="Local Agent")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -129,7 +129,7 @@ def skills_root() -> Path | None:
 
 def config_watch_filter(change: Change, changed_path: str) -> bool:
     try:
-        return Path(changed_path).resolve() == SETTINGS.CONFIG_PATH.expanduser().resolve()
+        return Path(changed_path).resolve() == CONFIG_PATH.resolve()
     except (OSError, RuntimeError):
         return False
 
@@ -137,7 +137,7 @@ def config_watch_filter(change: Change, changed_path: str) -> bool:
 @app.websocket("/ws/models")
 async def models(websocket: WebSocket) -> None:
     await websocket.accept()
-    config_path = SETTINGS.CONFIG_PATH.expanduser()
+    config_path = CONFIG_PATH
     changes = awatch(config_path.parent, watch_filter=config_watch_filter)
     try:
         await send_event(websocket, model_event())
@@ -167,7 +167,7 @@ async def skills(websocket: WebSocket) -> None:
     try:
         await send_event(websocket, index.event())
         while True:
-            paths = [SETTINGS.CONFIG_PATH.expanduser().parent]
+            paths = [CONFIG_PATH.parent]
             if index.root is not None:
                 paths.append(index.root)
             changes = awatch(*paths)
@@ -213,7 +213,7 @@ async def create_project(request: ProjectRequest) -> ProjectResponse:
 async def create_session(request: NewSessionRequest) -> NewSessionResponse:
     resolved = resolve_project_path(request.project_path)
     await interrupt_active_chat(resolved)
-    session = ConversationSession(SETTINGS.DATA_DIR, resolved)
+    session = ConversationSession(get_agent_config().data_dir, resolved)
     session.start_new()
     logger.info("New session started for project: {}", resolved)
     return NewSessionResponse(
@@ -233,7 +233,7 @@ async def interrupt_session(request: InterruptSessionRequest) -> InterruptSessio
 @app.get("/api/sessions")
 async def list_sessions(project_path: str) -> SessionListResponse:
     resolved = resolve_project_path(project_path)
-    session = ConversationSession(SETTINGS.DATA_DIR, resolved)
+    session = ConversationSession(get_agent_config().data_dir, resolved)
     return SessionListResponse(
         sessions=[SessionSummary(file_name=name) for name in session.list_files()]
     )
@@ -242,7 +242,7 @@ async def list_sessions(project_path: str) -> SessionListResponse:
 @app.get("/api/sessions/current")
 async def get_current_session(project_path: str) -> SessionResponse:
     resolved = resolve_project_path(project_path)
-    session = ConversationSession(SETTINGS.DATA_DIR, resolved)
+    session = ConversationSession(get_agent_config().data_dir, resolved)
     try:
         messages = session.load_latest()
     except (OSError, ValueError):
@@ -255,7 +255,7 @@ async def get_current_session(project_path: str) -> SessionResponse:
 async def open_session(request: OpenSessionRequest) -> SessionResponse:
     resolved = resolve_project_path(request.project_path)
     await interrupt_active_chat(resolved)
-    session = ConversationSession(SETTINGS.DATA_DIR, resolved)
+    session = ConversationSession(get_agent_config().data_dir, resolved)
     messages = session.load(request.session_file)
     logger.info("Session opened: {}", session.file_name)
     return SessionResponse(session_file=session.file_name, messages=messages)
@@ -365,7 +365,7 @@ async def chat(
     current_task = asyncio.current_task()
     if current_task is not None:
         ACTIVE_CHATS[project_key] = current_task
-    session = ConversationSession(SETTINGS.DATA_DIR, resolved)
+    session = ConversationSession(get_agent_config().data_dir, resolved)
     try:
         if session_file is None:
             session.load_latest()
@@ -376,9 +376,9 @@ async def chat(
     
     # Create agent based on compatible field
     if model_config.compatible == "openai":
-        agent = OpenAIAgent(SETTINGS, model_config, resolved)
+        agent = OpenAIAgent(get_agent_config(), model_config, resolved)
     else:
-        agent = AnthropicAgent(SETTINGS, model_config, resolved)
+        agent = AnthropicAgent(get_agent_config(), model_config, resolved)
     agent.load_session(session.messages)
 
     try:
@@ -434,6 +434,18 @@ async def chat(
                                 message_id=message_id,
                                 tool_call_id=event["tool_call_id"],
                                 tool_name=event["tool_name"],
+                                arguments=event["arguments"],
+                            ),
+                        )
+                    elif event["type"] == "tool_call_arguments":
+                        session.update_tool_arguments(
+                            event["tool_call_id"], event["arguments"]
+                        )
+                        await send_event(
+                            websocket,
+                            ToolCallArgumentsEvent(
+                                message_id=message_id,
+                                tool_call_id=event["tool_call_id"],
                                 arguments=event["arguments"],
                             ),
                         )

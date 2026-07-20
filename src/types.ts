@@ -131,6 +131,13 @@ export interface ToolCallStartEvent {
   arguments: Record<string, unknown>
 }
 
+export interface ToolCallArgumentsEvent {
+  type: 'tool_call_arguments'
+  messageId: string
+  toolCallId: string
+  arguments: Record<string, unknown>
+}
+
 export interface ToolCallResultEvent {
   type: 'tool_call_result'
   messageId: string
@@ -159,6 +166,7 @@ export type ServerEvent =
   | MessageStartEvent
   | ContentDeltaEvent
   | ToolCallStartEvent
+  | ToolCallArgumentsEvent
   | ToolCallResultEvent
   | MessageEndEvent
   | ErrorEvent

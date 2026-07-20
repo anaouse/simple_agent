@@ -137,6 +137,15 @@ class ConversationSession:
             )
         )
 
+    def update_tool_arguments(
+        self, tool_call_id: str, arguments: dict[str, object]
+    ) -> None:
+        for message in reversed(self.messages):
+            if isinstance(message, ToolChatMessage) and message.id == tool_call_id:
+                message.arguments = arguments
+                self._dirty = True
+                return
+
     def finish_tool(self, tool_call_id: str, result: str, is_error: bool) -> None:
         for message in reversed(self.messages):
             if isinstance(message, ToolChatMessage) and message.id == tool_call_id:
