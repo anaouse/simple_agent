@@ -1,6 +1,32 @@
 .project-item {
+  position: relative;
   flex: none;
   min-width: 0;
+}
+
+.project-item__menu {
+  position: absolute;
+  z-index: 2;
+  padding: 4px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: var(--gray-0);
+  box-shadow: 0 2px 8px var(--gray-300);
+}
+
+.project-item__delete {
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--red-600);
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.project-item__delete:hover {
+  background: var(--red-50);
 }
 
 .project-item__sessions {

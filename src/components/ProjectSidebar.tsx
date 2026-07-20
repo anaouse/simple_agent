@@ -13,6 +13,7 @@ interface ProjectSidebarProps {
   projects: Project[]
   sessionRefreshVersion: number
   onAdd: (project: Project) => void
+  onRemove: (path: string) => void
   onSelect: (path: string) => void | Promise<void>
   onSelectSession: (path: string, fileName: string) => void | Promise<void>
   onToggle: () => void
@@ -25,6 +26,7 @@ export default function ProjectSidebar({
   projects,
   sessionRefreshVersion,
   onAdd,
+  onRemove,
   onSelect,
   onSelectSession,
   onToggle,
@@ -84,6 +86,7 @@ export default function ProjectSidebar({
                 activePath={activePath}
                 activeSessionFile={activeSessionFile}
                 key={project.path}
+                onRemoveProject={onRemove}
                 onSelectProject={onSelect}
                 onSelectSession={onSelectSession}
                 project={project}

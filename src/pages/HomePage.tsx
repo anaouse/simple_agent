@@ -183,6 +183,20 @@ export default function HomePage() {
     ))
   }
 
+  function removeProject(path: string) {
+    setProjects((current) => current.filter((project) => project.path !== path))
+    if (path === activePath) {
+      socketRef.current?.close()
+      socketRef.current = null
+      setActivePath(null)
+      setActiveSessionFile(null)
+      setMessages([])
+      setWaiting(false)
+      activeMessageIdRef.current = null
+      messageCreatedAtRef.current.clear()
+    }
+  }
+
   function handleEvent(event: ServerEvent) {
     if (event.type === 'user_message') {
       setMessages((current) => [...current, {
@@ -344,6 +358,7 @@ export default function HomePage() {
         activeSessionFile={activeSessionFile}
         collapsed={sidebarCollapsed}
         onAdd={addProject}
+        onRemove={removeProject}
         onSelect={selectProject}
         onSelectSession={selectSession}
         onToggle={() => setSidebarCollapsed((current) => !current)}

@@ -10,6 +10,7 @@ interface ProjectItemProps {
   activeSessionFile: string | null
   project: Project
   refreshVersion: number
+  onRemoveProject: (path: string) => void
   onSelectProject: (path: string) => void | Promise<void>
   onSelectSession: (path: string, fileName: string) => void | Promise<void>
 }
@@ -19,10 +20,12 @@ export default function ProjectItem({
   activeSessionFile,
   project,
   refreshVersion,
+  onRemoveProject,
   onSelectProject,
   onSelectSession,
 }: ProjectItemProps) {
   const [sessions, setSessions] = useState<SessionSummary[]>([])
+  const [menuPosition, setMenuPosition] = useState<{ left: number, top: number } | null>(null)
   const active = project.path === activePath
 
   useEffect(() => {
@@ -33,15 +36,40 @@ export default function ProjectItem({
   }, [active, project.path, refreshVersion])
 
   return (
-    <div className="project-item">
+    <div
+      className="project-item"
+      onContextMenu={(event) => {
+        event.preventDefault()
+        const bounds = event.currentTarget.getBoundingClientRect()
+        setMenuPosition({ left: event.clientX - bounds.left, top: event.clientY - bounds.top })
+      }}
+    >
       <button
         className={active ? 'project-sidebar__item project-sidebar__item--active' : 'project-sidebar__item'}
-        onClick={() => onSelectProject(project.path)}
+        onClick={() => {
+          setMenuPosition(null)
+          onSelectProject(project.path)
+        }}
         title={project.path}
         type="button"
       >
         {project.path}
       </button>
+      {menuPosition && (
+        <div
+          className="project-item__menu"
+          onContextMenu={(event) => event.preventDefault()}
+          style={menuPosition}
+        >
+          <button
+            className="project-item__delete"
+            onClick={() => onRemoveProject(project.path)}
+            type="button"
+          >
+            删除项目
+          </button>
+        </div>
+      )}
       {active && (
         <div className="project-item__sessions">
           {sessions.length === 0 ? (
