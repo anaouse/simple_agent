@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Project, SessionListResponse, SessionSummary } from '@/types'
 
 const BACKEND_PORT = import.meta.env.VITE_BACKEND_PORT || '2453'
@@ -26,6 +26,7 @@ export default function ProjectItem({
 }: ProjectItemProps) {
   const [sessions, setSessions] = useState<SessionSummary[]>([])
   const [menuPosition, setMenuPosition] = useState<{ left: number, top: number } | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
   const active = project.path === activePath
 
   useEffect(() => {
@@ -34,6 +35,15 @@ export default function ProjectItem({
       .then((response) => setSessions(response.data.sessions))
       .catch(() => setSessions([]))
   }, [active, project.path, refreshVersion])
+
+  useEffect(() => {
+    if (!menuPosition) return
+    function closeMenu(event: PointerEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuPosition(null)
+    }
+    document.addEventListener('pointerdown', closeMenu)
+    return () => document.removeEventListener('pointerdown', closeMenu)
+  }, [menuPosition])
 
   return (
     <div
@@ -58,6 +68,7 @@ export default function ProjectItem({
       {menuPosition && (
         <div
           className="project-item__menu"
+          ref={menuRef}
           onContextMenu={(event) => event.preventDefault()}
           style={menuPosition}
         >

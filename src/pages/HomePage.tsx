@@ -371,7 +371,7 @@ export default function HomePage() {
           <span>{activePath ? (connected ? '已连接' : '连接中…') : '未选择项目'}</span>
         </header>
         <MessageArea messages={messages} />
-        <SessionInfo modelName={activeModelName} />
+        <SessionInfo modelName={activeModelName} messages={messages} />
         <InputBox
           disabled={!activePath || !connected || responding || startingSession}
           files={projectFiles}
