@@ -94,6 +94,23 @@ export default function HomePage() {
   }, [projects])
 
   useEffect(() => {
+    function handleGlobalKeyDown(event: KeyboardEvent) {
+      if (
+        event.key !== '/'
+        || event.ctrlKey
+        || event.altKey
+        || event.metaKey
+        || event.isComposing
+      ) return
+      const activeTag = (event.target as HTMLElement)?.tagName
+      if (activeTag === 'INPUT' || activeTag === 'TEXTAREA') return
+      if (inputBoxRef.current?.focus()) event.preventDefault()
+    }
+    document.addEventListener('keydown', handleGlobalKeyDown)
+    return () => document.removeEventListener('keydown', handleGlobalKeyDown)
+  }, [])
+
+  useEffect(() => {
     return () => {
       socketRef.current?.close()
     }
@@ -375,7 +392,7 @@ export default function HomePage() {
           <strong>{activePath ?? '请在侧边栏创建或选择一个项目'}</strong>
           <span>{activePath ? (connected ? '已连接' : '连接中…') : '未选择项目'}</span>
         </header>
-        <MessageArea messages={messages} onSlash={() => inputBoxRef.current?.focus() ?? false} />
+        <MessageArea messages={messages} />
         <SessionInfo modelName={activeModelName} responding={responding} totalToken={totalToken} />
         <InputBox
           disabled={!activePath || !connected || responding || startingSession}
