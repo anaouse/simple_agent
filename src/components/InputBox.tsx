@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react'
+import { ChangeEvent, forwardRef, FormEvent, KeyboardEvent, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import type { ModelSummary, ProjectFileEntry, SkillEntry } from '@/types'
 
 interface InputBoxProps {
@@ -29,7 +29,11 @@ interface Suggestion {
 
 const MAX_RESULTS = 30
 
-export default function InputBox({
+export interface InputBoxHandle {
+  focus: () => boolean
+}
+
+const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox({
   disabled,
   files,
   models,
@@ -40,7 +44,7 @@ export default function InputBox({
   onNewSession,
   onSend,
   onStop,
-}: InputBoxProps) {
+}, ref) {
   const [content, setContent] = useState('')
   const [cursor, setCursor] = useState(0)
   const [activeIndex, setActiveIndex] = useState(0)
@@ -55,6 +59,14 @@ export default function InputBox({
   useEffect(() => {
     activeSuggestionRef.current?.scrollIntoView({ block: 'nearest' })
   }, [activeIndex])
+
+  useImperativeHandle(ref, () => ({
+    focus() {
+      if (disabled) return false
+      requestAnimationFrame(() => textareaRef.current?.focus())
+      return true
+    },
+  }), [disabled])
 
   function buildSuggestions(): Suggestion[] {
     if (atQuery) {
@@ -247,7 +259,9 @@ export default function InputBox({
       )}
     </form>
   )
-}
+})
+
+export default InputBox
 
 function findAtQuery(content: string, cursor: number): TextQuery | null {
   const beforeCursor = content.slice(0, cursor)

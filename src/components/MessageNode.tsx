@@ -37,7 +37,7 @@ export default function MessageNode({ message }: MessageNodeProps) {
       : `工具 · ${message.toolName}`
 
   return (
-    <article className={`message-node message-node--${message.role}${expanded ? ' message-node--expanded' : ''}`}>
+    <article className={`message-node message-node--${message.role}${expanded ? ' message-node--expanded' : ''}`} tabIndex={0}>
       <button className="message-node__header" onClick={() => setExpanded(!expanded)} type="button">
         <span className="message-node__title">{title}</span>
         {!expanded && <span className="message-node__preview">{messagePreview(message)}</span>}

@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { useEffect, useRef, useState } from 'react'
-import InputBox from '@/components/InputBox'
+import InputBox, { type InputBoxHandle } from '@/components/InputBox'
 import MessageArea from '@/components/MessageArea'
 import ProjectSidebar from '@/components/ProjectSidebar'
 import SessionInfo from '@/components/SessionInfo'
@@ -58,6 +58,7 @@ export default function HomePage() {
   const [waiting, setWaiting] = useState(false)
   const [startingSession, setStartingSession] = useState(false)
   const socketRef = useRef<WebSocket | null>(null)
+  const inputBoxRef = useRef<InputBoxHandle | null>(null)
   const activeMessageIdRef = useRef<string | null>(null)
   const messageCreatedAtRef = useRef(new Map<string, string>())
 
@@ -152,16 +153,12 @@ export default function HomePage() {
     setActivePath(path)
     let sessionFile: string | null = null
     try {
-      const response = await axios.get<SessionResponse>(`${API_BASE_URL}/sessions/current`, {
-        params: { project_path: path },
-      })
-      setMessages(response.data.messages)
-      setTotalToken(response.data.totalToken)
+      const request: NewSessionRequest = { projectPath: path }
+      const response = await axios.post<NewSessionResponse>(`${API_BASE_URL}/sessions`, request)
       sessionFile = response.data.sessionFile
       setActiveSessionFile(sessionFile)
+      setSessionRefreshVersion((current) => current + 1)
     } catch {
-      setMessages([])
-      setTotalToken(0)
       setActiveSessionFile(null)
     }
     connect(path, sessionFile)
@@ -378,10 +375,11 @@ export default function HomePage() {
           <strong>{activePath ?? '请在侧边栏创建或选择一个项目'}</strong>
           <span>{activePath ? (connected ? '已连接' : '连接中…') : '未选择项目'}</span>
         </header>
-        <MessageArea messages={messages} />
-        <SessionInfo modelName={activeModelName} totalToken={totalToken} />
+        <MessageArea messages={messages} onSlash={() => inputBoxRef.current?.focus() ?? false} />
+        <SessionInfo modelName={activeModelName} responding={responding} totalToken={totalToken} />
         <InputBox
           disabled={!activePath || !connected || responding || startingSession}
+          ref={inputBoxRef}
           files={projectFiles}
           models={models}
           skills={skills}
