@@ -8,7 +8,7 @@ export default function SessionInfo({ modelName, totalToken }: SessionInfoProps)
     <div className="session-info">
       <span>当前模型</span>
       <strong>{modelName ?? '未加载'}</strong>
-      <span>当前对话</span>
+      <span>当前上下文</span>
       <strong>{totalToken} Token</strong>
     </div>
   )

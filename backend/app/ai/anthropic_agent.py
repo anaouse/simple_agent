@@ -104,7 +104,10 @@ class AnthropicAgent:
 
                 logger.info("Upstream API call completed")
                 self._total_token = (
-                    final_message.usage.input_tokens + final_message.usage.output_tokens
+                    final_message.usage.input_tokens
+                    + getattr(final_message.usage, "cache_read_input_tokens", 0)
+                    + getattr(final_message.usage, "cache_creation_input_tokens", 0)
+                    + final_message.usage.output_tokens
                 )
                 assistant_message = self._message_to_dict(final_message)
                 self._messages.append(assistant_message)
