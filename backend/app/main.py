@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from loguru import logger
 from pydantic import ValidationError
 from watchfiles import Change, awatch
+from win11toast import toast
 
 from app.ai.anthropic_agent import AnthropicAgent
 from app.ai.openai_agent import OpenAIAgent
@@ -480,6 +481,7 @@ async def chat(
                         total_token=session.total_token,
                     ),
                 )
+                toast("Simple Agent", "模型回答已结束", app_id="Simple Agent")
             except WebSocketDisconnect:
                 raise
             except Exception:
@@ -493,6 +495,7 @@ async def chat(
                         )
                     ),
                 )
+                toast("Simple Agent", "模型回答出错", app_id="Simple Agent")
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected")
     except asyncio.CancelledError:
