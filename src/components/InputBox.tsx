@@ -104,7 +104,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox({
         .filter((command) => command.includes(slashQuery.query))
         .map((command) => ({
           key: `command:${command}`,
-          icon: '/',
+          icon: '',
           label: `/${command}`,
           onSelect: () => replaceQuery(slashQuery, `/${command} `),
         }))
