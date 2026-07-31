@@ -1,3 +1,4 @@
+import json
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Callable, Literal, TypedDict
@@ -86,33 +87,71 @@ class AnthropicAgent:
                 if self._system_prompt:
                     request["system"] = self._system_prompt
 
-                async with self._client.messages.stream(**request) as stream:
-                    async for event in stream:
-                        if event.type == "content_block_start" and event.content_block.type == "tool_use":
-                            logger.info(
-                                "Tool call arguments started: {}", event.content_block.name
+                stream = await self._client.messages.create(**request, stream=True)
+                final_message: dict[str, object] = {
+                    "role": "assistant",
+                    "content": [],
+                    "stop_reason": None,
+                    "usage": {},
+                }
+                tool_json: dict[int, list[str]] = {}
+
+                async for event in stream:
+                    if event.type == "content_block_start":
+                        block = event.content_block
+                        if block.type == "text":
+                            final_message["content"].append({"type": "text", "text": ""})
+                        elif block.type == "thinking":
+                            final_message["content"].append(
+                                {"type": "thinking", "thinking": "", "signature": ""}
                             )
+                        elif block.type == "tool_use":
+                            logger.info("Tool call arguments started: {}", block.name)
+                            final_message["content"].append(
+                                {"type": "tool_use", "id": block.id, "name": block.name, "input": {}}
+                            )
+                            tool_json[event.index] = []
                             yield {
                                 "type": "tool_call_start",
-                                "tool_call_id": event.content_block.id,
-                                "tool_name": event.content_block.name,
+                                "tool_call_id": block.id,
+                                "tool_name": block.name,
                                 "arguments": {},
                             }
-                        elif event.type == "content_block_delta" and event.delta.type == "text_delta":
+                    elif event.type == "content_block_delta":
+                        block = final_message["content"][event.index]
+                        if event.delta.type == "text_delta" and block["type"] == "text":
+                            block["text"] += event.delta.text
                             yield {"type": "content_delta", "delta": event.delta.text}
-                    final_message = await stream.get_final_message()
+                        elif event.delta.type == "thinking_delta" and block["type"] == "thinking":
+                            block["thinking"] += event.delta.thinking
+                        elif event.delta.type == "signature_delta" and block["type"] == "thinking":
+                            block["signature"] = event.delta.signature
+                        elif event.delta.type == "input_json_delta":
+                            tool_json.setdefault(event.index, []).append(event.delta.partial_json)
+                    elif event.type == "message_delta":
+                        final_message["stop_reason"] = event.delta.stop_reason
+                        final_message["usage"] = event.usage.model_dump()
+
+                for index, raw_json in tool_json.items():
+                    block = final_message["content"][index]
+                    try:
+                        block["input"] = json.loads("".join(raw_json))
+                    except json.JSONDecodeError as exception:
+                        logger.error("Invalid tool call JSON for {}: {}", block["name"], exception)
+                        block["input"] = {"_invalid_json": str(exception)}
 
                 logger.info("Upstream API call completed")
+                usage = final_message["usage"]
                 self._total_token = (
-                    final_message.usage.input_tokens
-                    + getattr(final_message.usage, "cache_read_input_tokens", 0)
-                    + getattr(final_message.usage, "cache_creation_input_tokens", 0)
-                    + final_message.usage.output_tokens
+                    int(usage.get("input_tokens") or 0)
+                    + int(usage.get("cache_read_input_tokens") or 0)
+                    + int(usage.get("cache_creation_input_tokens") or 0)
+                    + int(usage.get("output_tokens") or 0)
                 )
-                assistant_message = self._message_to_dict(final_message)
+                assistant_message = final_message
                 self._messages.append(assistant_message)
 
-                if final_message.stop_reason != "tool_use":
+                if final_message.get("stop_reason") != "tool_use":
                     break
 
                 async for tool_event in self._execute_tools(assistant_message):

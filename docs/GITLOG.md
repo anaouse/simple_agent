@@ -9,3 +9,8 @@
 后续调优：
 
 commit 9d434b033d4772247096adae81665faafdb1e66a Date: Wed Jul 29 15:38:25 2026 +0800
+
+#
+
+1. InputBox 的 UI “/” 修改
+2. 修复 Anthropic agent 回答时候有时候工具调用错误
