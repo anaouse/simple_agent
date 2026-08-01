@@ -23,9 +23,18 @@ class ModelListResponse(ApiModel):
     models: list[ModelSummary]
 
 
+class DefaultModelRequest(ApiModel):
+    model_name: str = Field(min_length=1)
+
+
+class DefaultModelResponse(ApiModel):
+    default_model: str
+
+
 class ModelsEvent(ApiModel):
     type: Literal["models"] = "models"
     models: list[ModelSummary]
+    default_model: str | None = None
 
 
 class SkillEntry(ApiModel):

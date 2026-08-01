@@ -69,8 +69,8 @@ export default function HomePage() {
       const event = JSON.parse(message.data) as ModelsEvent
       if (event.type !== 'models') return
       setModels(event.models)
-      setActiveModelName((current) => event.models.some((model) => model.name === current)
-        ? current
+      setActiveModelName((current) => event.defaultModel && event.models.some((model) => model.name === event.defaultModel)
+        ? event.defaultModel
         : event.models[0]?.name ?? null)
     }
     socket.onclose = () => {
@@ -337,8 +337,13 @@ export default function HomePage() {
     }
   }
 
-  function selectModel(modelName: string) {
+  async function selectModel(modelName: string) {
     if (modelName === activeModelName) return
+    try {
+      await axios.put(`${API_BASE_URL}/models/default`, { modelName })
+    } catch {
+      return
+    }
     setActiveModelName(modelName)
     if (activePath) connect(activePath, activeSessionFile, modelName)
   }

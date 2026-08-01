@@ -15,6 +15,7 @@ class ModelConfig(BaseModel):
 
 class AgentConfig(BaseModel):
     models: list[ModelConfig] = Field(min_length=1)
+    default_model: str | None = None
     system_prompt_path: Path | None = None
     data_dir: Path
     skills_path: Path | None = None
@@ -34,10 +35,26 @@ def get_agent_config() -> AgentConfig:
 
 
 def get_model_config(name: str | None = None) -> ModelConfig:
-    models = get_agent_config().models
-    if name is None:
+    config = get_agent_config()
+    models = config.models
+    model_name = name if name is not None else config.default_model
+    if model_name is None:
         return models[0]
     for model in models:
-        if model.name == name:
+        if model.name == model_name:
             return model
+    if name is None:
+        return models[0]
     raise ValueError(f"未知模型: {name}")
+
+
+def set_default_model(name: str) -> None:
+    content = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    config = AgentConfig.model_validate(content)
+    if not any(model.name == name for model in config.models):
+        raise ValueError(f"未知模型: {name}")
+    content["default_model"] = name
+    CONFIG_PATH.write_text(
+        json.dumps(content, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )

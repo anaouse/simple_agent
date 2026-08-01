@@ -68,7 +68,6 @@ export default function ProjectSidebar({
       </button>
       {!collapsed && (
         <div className="project-sidebar__content">
-          <h2>项目</h2>
           <form className="project-sidebar__form" onSubmit={submit}>
             <input
               aria-label="项目文件夹路径"

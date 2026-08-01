@@ -14,7 +14,7 @@ from win11toast import toast
 
 from app.ai.anthropic_agent import AnthropicAgent
 from app.ai.openai_agent import OpenAIAgent
-from app.config import CONFIG_PATH, get_agent_config, get_model_config
+from app.config import CONFIG_PATH, get_agent_config, get_model_config, set_default_model
 from app.project_files import ProjectFileIndex
 from app.skill_files import SkillIndex
 from app.session import ConversationSession
@@ -31,6 +31,8 @@ from app.models import (
     MessageStartEvent,
     ModelListResponse,
     ModelSummary,
+    DefaultModelRequest,
+    DefaultModelResponse,
     NewSessionRequest,
     NewSessionResponse,
     OpenSessionRequest,
@@ -106,6 +108,12 @@ async def list_models() -> ModelListResponse:
     )
 
 
+@app.put("/api/models/default")
+async def update_default_model(request: DefaultModelRequest) -> DefaultModelResponse:
+    set_default_model(request.model_name)
+    return DefaultModelResponse(default_model=request.model_name)
+
+
 def model_event() -> ModelsEvent:
     try:
         models = [
@@ -114,7 +122,11 @@ def model_event() -> ModelsEvent:
         ]
     except (OSError, ValueError, ValidationError):
         models = []
-    return ModelsEvent(models=models)
+    try:
+        default_model = get_agent_config().default_model
+    except (OSError, ValueError, ValidationError):
+        default_model = None
+    return ModelsEvent(models=models, default_model=default_model)
 
 
 def skills_root() -> Path | None:

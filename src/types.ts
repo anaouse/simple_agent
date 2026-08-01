@@ -14,6 +14,7 @@ export interface ModelListResponse {
 export interface ModelsEvent {
   type: 'models'
   models: ModelSummary[]
+  defaultModel: string | null
 }
 
 export interface SkillEntry {
