@@ -1,17 +1,18 @@
 .message-node {
   margin-bottom: 12px;
-  border: 1px solid var(--gray-200);
+  border: 1px solid var(--message-agent-border);
   border-radius: 10px;
-  background: var(--gray-0);
+  background: var(--message-agent-background);
 }
 
 .message-node--user {
-  background: var(--gray-50);
+  border-color: var(--message-user-border);
+  background: var(--message-user-background);
 }
 
 .message-node--tool {
-  border-color: var(--gray-300);
-  background: var(--gray-100);
+  border-color: var(--message-tool-border);
+  background: var(--message-tool-background);
 }
 
 .message-node__header {
@@ -40,12 +41,25 @@
   flex: none;
 }
 
+.message-node__title {
+  color: var(--message-agent-accent);
+  font-weight: 700;
+}
+
+.message-node--user .message-node__title {
+  color: var(--message-user-accent);
+}
+
+.message-node--tool .message-node__title {
+  color: var(--message-tool-accent);
+}
+
 .message-node__preview {
   min-width: 0;
   flex: 1;
   overflow: hidden;
   color: var(--gray-500);
-  font-size: 13px;
+  font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -59,6 +73,7 @@
 .message-node__content {
   padding: 0 14px 14px;
   color: var(--gray-700);
+  font-size: 15px;
   line-height: 1.65;
   overflow-wrap: anywhere;
 }

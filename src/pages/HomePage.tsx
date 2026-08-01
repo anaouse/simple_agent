@@ -49,6 +49,7 @@ export default function HomePage() {
   const [sessionRefreshVersion, setSessionRefreshVersion] = useState(0)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [toolsHidden, setToolsHidden] = useState(false)
   const [totalToken, setTotalToken] = useState(0)
   const [models, setModels] = useState<ModelSummary[]>([])
   const [skills, setSkills] = useState<SkillEntry[]>([])
@@ -392,8 +393,14 @@ export default function HomePage() {
           <strong>{activePath ?? '请在侧边栏创建或选择一个项目'}</strong>
           <span>{activePath ? (connected ? '已连接' : '连接中…') : '未选择项目'}</span>
         </header>
-        <MessageArea messages={messages} />
-        <SessionInfo modelName={activeModelName} responding={responding} totalToken={totalToken} />
+        <MessageArea messages={messages} toolsHidden={toolsHidden} />
+        <SessionInfo
+          modelName={activeModelName}
+          responding={responding}
+          totalToken={totalToken}
+          toolsHidden={toolsHidden}
+          onToolsHiddenChange={setToolsHidden}
+        />
         <InputBox
           disabled={!activePath || !connected || responding || startingSession}
           ref={inputBoxRef}

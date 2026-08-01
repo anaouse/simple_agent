@@ -25,6 +25,17 @@
   --red-700: #5c2d28;
   --red-800: #43201d;
   --red-900: #2b1513;
+
+  /* Message node roles */
+  --message-user-background: var(--red-50);
+  --message-user-border: var(--red-300);
+  --message-user-accent: var(--red-600);
+  --message-agent-background: var(--gray-0);
+  --message-agent-border: var(--gray-700);
+  --message-agent-accent: var(--gray-800);
+  --message-tool-background: var(--gray-100);
+  --message-tool-border: var(--gray-400);
+  --message-tool-accent: var(--gray-600);
 }
 
 * {

@@ -30,16 +30,10 @@ function messagePreview(message: ChatMessage) {
 
 export default function MessageNode({ message }: MessageNodeProps) {
   const [expanded, setExpanded] = useState(false)
-  const title = message.role === 'user'
-    ? '你'
-    : message.role === 'assistant'
-      ? 'Agent'
-      : `工具 · ${message.toolName}`
-
   return (
     <article className={`message-node message-node--${message.role}${expanded ? ' message-node--expanded' : ''}`}>
       <button className="message-node__header" onClick={() => setExpanded(!expanded)} type="button">
-        <span className="message-node__title">{title}</span>
+        {message.role === 'tool' && <span className="message-node__title">{message.toolName}</span>}
         {!expanded && <span className="message-node__preview">{messagePreview(message)}</span>}
         <span className="message-node__meta">{statusText(message, expanded)}</span>
       </button>

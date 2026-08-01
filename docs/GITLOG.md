@@ -10,7 +10,11 @@
 
 commit 9d434b033d4772247096adae81665faafdb1e66a Date: Wed Jul 29 15:38:25 2026 +0800
 
-# commit 490afc75f740f93d11ac3054817ddaec5186b1a8 Date: Fri Jul 31 11:00:07 2026 +0800
+# 2026-07-31 11:28:44
 
 1. InputBox 的 UI “/” 修改
 2. 修复 Anthropic agent 回答时候有时候工具调用错误
+
+# 2026-07-31 11:28:52
+
+1. 加入通知功能
