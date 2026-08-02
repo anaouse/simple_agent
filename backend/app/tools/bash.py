@@ -1,8 +1,11 @@
+import shlex
 import subprocess
 import time
 
 BASH_PATH = r"D:\Git\Git\usr\bin\bash.exe"
 ALLOWED_COMMANDS = {"ls", "grep", "find"}
+FORBIDDEN_SHELL_CHARS = set(";&|><`\n\r")
+
 
 
 def bash(command: str, timeout: int = 30, max_output_chars: int = 50000) -> str:
@@ -15,25 +18,29 @@ def bash(command: str, timeout: int = 30, max_output_chars: int = 50000) -> str:
         timeout: Maximum seconds to wait for the command; defaults to 30
         max_output_chars: Maximum characters for stdout/stderr each; defaults to 50000
     """
-    # Validate that only allowed commands are used
     command_stripped = command.strip()
     if not command_stripped:
         return "Error: empty command"
-    
-    # Extract the first word (the actual command)
-    first_word = command_stripped.split()[0] if command_stripped.split() else ""
-    
-    # Check if it's an allowed command
-    if first_word not in ALLOWED_COMMANDS:
+    if any(character in FORBIDDEN_SHELL_CHARS for character in command_stripped) or "$(" in command_stripped:
+        return "Error: compound commands and command substitution are not allowed"
+    try:
+        arguments = shlex.split(command_stripped, posix=True)
+    except ValueError as exception:
+        return f"Error: invalid command syntax: {exception}"
+
+    if not arguments:
+        return "Error: empty command"
+    executable = arguments[0]
+    if executable not in ALLOWED_COMMANDS:
         return (
-            f"Error: command '{first_word}' is not allowed. "
+            f"Error: command '{executable}' is not allowed. "
             f"Only {', '.join(sorted(ALLOWED_COMMANDS))} are permitted."
         )
 
     process = None
     try:
         process = subprocess.Popen(
-            [BASH_PATH, "-c", command],
+            [BASH_PATH, "-c", 'exec "$@"', "bash", *arguments],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,

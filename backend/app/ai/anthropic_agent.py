@@ -287,7 +287,7 @@ class AnthropicAgent:
         """Add the active project path to the configured system prompt."""
         project_section = (
             "# 目前所在目录\n\n"
-            f"目前所在目录是 `{self._project_path.as_posix()}`，所有文件工具只能访问该目录及其子目录。"
+            f"当前工作目录是 `{self._project_path.as_posix()}`。write 和 edit 仅可操作该目录及其子目录；read、walk 以及 bash 中允许的 ls、grep、find 可访问进程权限允许的其他路径。bash 仅允许执行 ls、grep、find，且不要使用复合命令。"
         )
         if not base_prompt:
             return project_section

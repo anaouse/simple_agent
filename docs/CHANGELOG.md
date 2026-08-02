@@ -23,3 +23,4 @@ commit 9d434b033d4772247096adae81665faafdb1e66a Date: Wed Jul 29 15:38:25 2026 +
 
 1. MessageArea 里面节点颜色变化，加入可隐藏工具节点
 2. SessionInfo 简化显示信息改为 hover 显示
+3. 加入默认模型到config
