@@ -13,8 +13,8 @@
   height: 100%;
   max-width: 800px;
   margin: 0 auto;
-  background: var(--gray-0);
-  border-inline: 1px solid var(--gray-200);
+  background: var(--color-surface);
+  border-inline: 1px solid var(--color-border);
 }
 
 .home-page__header {
@@ -23,7 +23,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 16px 20px;
-  border-bottom: 1px solid var(--gray-200);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .home-page__header strong {
@@ -35,6 +35,6 @@
 
 .home-page__header span {
   flex: none;
-  color: var(--gray-500);
+  color: var(--color-text-muted);
   font-size: 13px;
 }

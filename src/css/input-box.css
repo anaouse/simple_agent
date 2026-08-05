@@ -4,7 +4,7 @@
   align-items: end;
   gap: 10px;
   padding: 16px 20px;
-  background: var(--gray-0);
+  background: var(--color-surface);
 }
 
 .input-box__editor {
@@ -19,11 +19,11 @@
   min-height: 44px;
   max-height: calc(7.5em + 24px);
   padding: 11px 13px;
-  border: 1px solid var(--gray-300);
+  border: 1px solid var(--color-border-strong);
   border-radius: 8px;
   outline: none;
-  color: var(--gray-900);
-  background: var(--gray-0);
+  color: var(--color-text);
+  background: var(--color-surface);
   font-family: inherit;
   font-size: inherit;
   line-height: 1.5;
@@ -40,10 +40,10 @@
   max-height: 280px;
   padding: 6px;
   overflow-y: auto;
-  border: 1px solid var(--gray-300);
+  border: 1px solid var(--color-border-strong);
   border-radius: 8px;
-  background: var(--gray-0);
-  box-shadow: 0 8px 24px var(--gray-300);
+  background: var(--color-surface);
+  box-shadow: 0 8px 24px var(--color-shadow);
 }
 
 .input-box .input-box__suggestion {
@@ -55,14 +55,14 @@
   padding: 8px 10px;
   border-radius: 6px;
   background: transparent;
-  color: var(--gray-700);
+  color: var(--color-text-secondary);
   text-align: left;
 }
 
 .input-box .input-box__suggestion:hover,
 .input-box .input-box__suggestion--active {
-  background: var(--gray-200);
-  color: var(--gray-900);
+  background: var(--color-surface-hover);
+  color: var(--color-text);
 }
 
 .input-box textarea:focus {
@@ -75,14 +75,14 @@
   border: 0;
   border-radius: 8px;
   background: var(--red-500);
-  color: var(--gray-0);
+  color: var(--color-on-accent);
   cursor: pointer;
 }
 
 .input-box .input-box__new-session {
-  border: 1px solid var(--gray-300);
-  background: var(--gray-0);
-  color: var(--gray-700);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
 }
 
 .input-box button:disabled,

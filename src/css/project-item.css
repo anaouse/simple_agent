@@ -8,10 +8,10 @@
   position: absolute;
   z-index: 2;
   padding: 4px;
-  border: 1px solid var(--gray-300);
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
-  background: var(--gray-0);
-  box-shadow: 0 2px 8px var(--gray-300);
+  background: var(--color-surface);
+  box-shadow: 0 2px 8px var(--color-shadow);
 }
 
 .project-item__delete {
@@ -19,14 +19,14 @@
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: var(--red-600);
+  color: var(--color-error);
   cursor: pointer;
   font-size: 13px;
   white-space: nowrap;
 }
 
 .project-item__delete:hover {
-  background: var(--red-50);
+  background: var(--color-error-background);
 }
 
 .project-item__sessions {
@@ -38,7 +38,7 @@
   padding-left: 8px;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  border-left: 1px solid var(--gray-300);
+  border-left: 1px solid var(--color-border-strong);
 }
 
 .project-item__session {
@@ -49,7 +49,7 @@
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: var(--gray-600);
+  color: var(--color-text-secondary);
   cursor: pointer;
   font-size: 13px;
   text-align: left;
@@ -58,17 +58,17 @@
 }
 
 .project-item__session:hover {
-  background: var(--gray-200);
-  color: var(--gray-800);
+  background: var(--color-surface-hover);
+  color: var(--color-text);
 }
 
 .project-item__session--active {
-  background: var(--red-100);
-  color: var(--red-700);
+  background: var(--color-selected-background);
+  color: var(--color-selected-text);
 }
 
 .project-item__empty {
   padding: 7px 9px;
-  color: var(--gray-400);
+  color: var(--color-text-faint);
   font-size: 13px;
 }

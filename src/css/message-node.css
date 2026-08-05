@@ -23,7 +23,7 @@
   padding: 12px 14px;
   border: 0;
   background: transparent;
-  color: var(--gray-800);
+  color: var(--color-text-secondary);
   cursor: pointer;
   text-align: left;
 }
@@ -58,7 +58,7 @@
   min-width: 0;
   flex: 1;
   overflow: hidden;
-  color: var(--gray-500);
+  color: var(--color-text-muted);
   font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -66,13 +66,13 @@
 
 .message-node__meta {
   margin-left: auto;
-  color: var(--gray-500);
+  color: var(--color-text-muted);
   font-size: 13px;
 }
 
 .message-node__content {
   padding: 0 14px 14px;
-  color: var(--gray-700);
+  color: var(--color-text-secondary);
   font-size: 15px;
   line-height: 1.65;
   overflow-wrap: anywhere;
@@ -87,7 +87,7 @@
 }
 
 .message-node__error {
-  color: var(--red-500);
+  color: var(--color-error);
   font-size: 13px;
 }
 
@@ -103,7 +103,7 @@
 .message-node__tool-details strong {
   display: block;
   margin-bottom: 6px;
-  color: var(--gray-600);
+  color: var(--color-text-secondary);
   font-size: 13px;
 }
 
@@ -112,17 +112,17 @@
   margin: 0;
   padding: 10px 12px;
   overflow: auto;
-  border: 1px solid var(--gray-200);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
-  background: var(--gray-0);
-  color: var(--gray-700);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
   font: 13px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
 .message-node__tool-details .message-node__tool-result--error {
-  border-color: var(--red-200);
-  background: var(--red-50);
-  color: var(--red-600);
+  border-color: var(--color-error-border);
+  background: var(--color-error-background);
+  color: var(--color-error);
 }
