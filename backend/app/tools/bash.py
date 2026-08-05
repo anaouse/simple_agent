@@ -3,15 +3,56 @@ import subprocess
 import time
 
 BASH_PATH = r"D:\Git\Git\usr\bin\bash.exe"
-ALLOWED_COMMANDS = {"ls", "grep", "find"}
-FORBIDDEN_SHELL_CHARS = set(";&|><`\n\r")
+ALLOWED_COMMANDS = {"find", "grep", "head", "ls", "wc", "cat", "tail", "date", "pwd", "ps",}
+FORBIDDEN_SHELL_CHARS = set("><`\n\r$")
+COMPOUND_OPERATORS = {"|", "&&", "||", ";"}
+
+
+def _validate_command(command: str) -> str | None:
+    """Validate a sequence of allowed commands joined by shell operators."""
+    if any(character in FORBIDDEN_SHELL_CHARS for character in command):
+        return "Error: redirection, command substitution, and multi-line commands are not allowed"
+
+    try:
+        lexer = shlex.shlex(command, posix=True, punctuation_chars="|&;()")
+        lexer.whitespace_split = True
+        lexer.commenters = ""
+        tokens = list(lexer)
+    except ValueError as exception:
+        return f"Error: invalid command syntax: {exception}"
+
+    if not tokens:
+        return "Error: empty command"
+
+    expecting_command = True
+    for token in tokens:
+        if token in COMPOUND_OPERATORS:
+            if expecting_command:
+                return f"Error: unexpected operator '{token}'"
+            expecting_command = True
+            continue
+        if expecting_command:
+            # 只检查子命令的第一个词是否在白名单里
+            if token not in ALLOWED_COMMANDS:
+                return (
+                    f"Error: command '{token}' is not allowed. "
+                    f"Only {', '.join(sorted(ALLOWED_COMMANDS))} are permitted."
+                )
+            expecting_command = False
+        # 非首词（参数）不再逐个校验
+
+    if expecting_command:
+        return "Error: command cannot end with an operator"
+    return None
 
 
 
 def bash(command: str, timeout: int = 30, max_output_chars: int = 50000) -> str:
     """Execute a shell command via bash using Git Bash.
 
-    Only allows ls, grep, and find commands for security reasons.
+    Only allows find, grep, head, ls, and wc. Commands may be combined with
+    pipes, &&, ||, or ;. Redirection, command substitution, and subshells
+    remain disallowed.
 
     Args:
         command: The shell command to execute, e.g., 'ls -la /some/path'
@@ -21,26 +62,14 @@ def bash(command: str, timeout: int = 30, max_output_chars: int = 50000) -> str:
     command_stripped = command.strip()
     if not command_stripped:
         return "Error: empty command"
-    if any(character in FORBIDDEN_SHELL_CHARS for character in command_stripped) or "$(" in command_stripped:
-        return "Error: compound commands and command substitution are not allowed"
-    try:
-        arguments = shlex.split(command_stripped, posix=True)
-    except ValueError as exception:
-        return f"Error: invalid command syntax: {exception}"
-
-    if not arguments:
-        return "Error: empty command"
-    executable = arguments[0]
-    if executable not in ALLOWED_COMMANDS:
-        return (
-            f"Error: command '{executable}' is not allowed. "
-            f"Only {', '.join(sorted(ALLOWED_COMMANDS))} are permitted."
-        )
+    validation_error = _validate_command(command_stripped)
+    if validation_error:
+        return validation_error
 
     process = None
     try:
         process = subprocess.Popen(
-            [BASH_PATH, "-c", 'exec "$@"', "bash", *arguments],
+            [BASH_PATH, "-c", command_stripped],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,

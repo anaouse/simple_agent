@@ -9,7 +9,7 @@ from openai import AsyncOpenAI
 from app.ai.openai_session_adaptor import OpenAISessionAdaptor
 from app.config import AgentConfig, ModelConfig
 from app.models import ChatMessage
-from app.tools import bash, edit, read, walk, write
+from app.tools import bash, edit, read, walk, web_fetch, write
 from app.tools.security import set_project_root
 
 
@@ -70,6 +70,7 @@ class OpenAIAgent:
             "edit": edit,
             "walk": walk,
             "bash": bash,
+            "web_fetch": web_fetch,
         }
 
     def load_session(self, messages: list[ChatMessage]) -> None:
@@ -325,7 +326,7 @@ class OpenAIAgent:
         from app.tools.tool_utils import tools_from_functions
 
         anthropic_tools, _ = tools_from_functions(
-            [read, write, edit, walk, bash]
+            [read, write, edit, walk, bash, web_fetch]
         )
 
         # Convert Anthropic tool schema to OpenAI function calling schema

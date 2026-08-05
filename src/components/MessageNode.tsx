@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Streamdown } from 'streamdown'
 import { createMathPlugin } from '@streamdown/math'
 import { code } from '@streamdown/code'
@@ -28,15 +28,40 @@ function messagePreview(message: ChatMessage) {
   return normalized.length > 80 ? `${normalized.slice(0, 80)}…` : normalized
 }
 
+function copyContent(message: ChatMessage) {
+  return message.role === 'tool' ? JSON.stringify(message, null, 2) : message.content
+}
+
 export default function MessageNode({ message }: MessageNodeProps) {
   const [expanded, setExpanded] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const copyTimer = useRef<number | undefined>(undefined)
+
+  useEffect(() => () => window.clearTimeout(copyTimer.current), [])
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(copyContent(message))
+    window.clearTimeout(copyTimer.current)
+    setCopied(true)
+    copyTimer.current = window.setTimeout(() => setCopied(false), 3000)
+  }
+
   return (
     <article className={`message-node message-node--${message.role}${expanded ? ' message-node--expanded' : ''}`}>
-      <button className="message-node__header" onClick={() => setExpanded(!expanded)} type="button">
-        {message.role === 'tool' && <span className="message-node__title">{message.toolName}</span>}
-        {!expanded && <span className="message-node__preview">{messagePreview(message)}</span>}
-        <span className="message-node__meta">{statusText(message, expanded)}</span>
-      </button>
+      <div className="message-node__header">
+        <button className="message-node__header-toggle" onClick={() => setExpanded(!expanded)} type="button">
+          {message.role === 'tool' && <span className="message-node__title">{message.toolName}</span>}
+          {!expanded && <span className="message-node__preview">{messagePreview(message)}</span>}
+          <span className="message-node__meta">{statusText(message, expanded)}</span>
+        </button>
+        <button
+          className="message-node__copy"
+          onClick={() => void handleCopy()}
+          type="button"
+        >
+          {copied ? '✓ 已复制' : '复制'}
+        </button>
+      </div>
       {expanded && (
         <div className="message-node__content">
           {message.role === 'tool' ? (

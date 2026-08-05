@@ -1,6 +1,23 @@
+import difflib
 from pathlib import Path
 
 from app.tools.security import ensure_in_project
+
+
+def closest_match_context(content: str, old_text: str) -> str:
+    lines = content.splitlines()
+    target = old_text.splitlines()[0]
+    if not lines:
+        return "The file is empty."
+
+    closest_index = max(
+        range(len(lines)),
+        key=lambda index: difflib.SequenceMatcher(None, target, lines[index]).ratio(),
+    )
+    start = max(0, closest_index - 2)
+    end = min(len(lines), closest_index + 3)
+    context = "\n".join(f"{line_number + 1}: {lines[line_number]}" for line_number in range(start, end))
+    return f"Closest match to the first line is near line {closest_index + 1}:\n{context}"
 
 
 def edit(path: str, old_text: list[str], new_text: list[str]) -> str:
@@ -29,20 +46,27 @@ def edit(path: str, old_text: list[str], new_text: list[str]) -> str:
     if any(text == "" for text in old_text):
         return "old_text items must not be empty"
 
+    old_text = [text.replace("\r\n", "\n").replace("\r", "\n") for text in old_text]
+    new_text = [text.replace("\r\n", "\n").replace("\r", "\n") for text in new_text]
+
     candidate = Path(path)
     if not candidate.exists():
         return f"Path does not exist: {path}"
     if not candidate.is_file():
         return f"Path is not a file: {path}"
     try:
-        replaced = candidate.read_text(encoding="utf-8")
+        with candidate.open("r", encoding="utf-8", newline=None) as file:
+            replaced = file.read()
     except Exception as exception:
         return f"Failed to read file: {exception}"
 
     for index, (old, new) in enumerate(zip(old_text, new_text), start=1):
         count = replaced.count(old)
         if count == 0:
-            return f"No match found for old_text item {index} in the file"
+            return (
+                f"No match found for old_text item {index} in the file. "
+                f"{closest_match_context(replaced, old)}"
+            )
         if count > 1:
             return (
                 f"old_text item {index} matched {count} occurrences, not unique. "
@@ -51,7 +75,8 @@ def edit(path: str, old_text: list[str], new_text: list[str]) -> str:
         replaced = replaced.replace(old, new)
 
     try:
-        candidate.write_text(replaced, encoding="utf-8")
+        with candidate.open("w", encoding="utf-8", newline="\n") as file:
+            file.write(replaced)
         return f"Successfully applied {len(old_text)} edits to file: {path}"
     except Exception as exception:
         return f"Failed to write file: {exception}"
