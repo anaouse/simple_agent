@@ -6,6 +6,7 @@ import type { ChatMessage } from '@/types'
 
 interface MessageNodeProps {
   message: ChatMessage
+  expandSignal: string | null
 }
 
 const math = createMathPlugin({
@@ -32,12 +33,18 @@ function copyContent(message: ChatMessage) {
   return message.role === 'tool' ? JSON.stringify(message, null, 2) : message.content
 }
 
-export default function MessageNode({ message }: MessageNodeProps) {
+export default function MessageNode({ message, expandSignal }: MessageNodeProps) {
   const [expanded, setExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
   const copyTimer = useRef<number | undefined>(undefined)
+  const previousExpandSignalRef = useRef(expandSignal)
 
   useEffect(() => () => window.clearTimeout(copyTimer.current), [])
+
+  useEffect(() => {
+    if (expandSignal && expandSignal !== previousExpandSignalRef.current) setExpanded(true)
+    previousExpandSignalRef.current = expandSignal
+  }, [expandSignal])
 
   async function handleCopy() {
     await navigator.clipboard.writeText(copyContent(message))

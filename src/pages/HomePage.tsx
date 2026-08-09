@@ -29,6 +29,7 @@ const FILES_WS_BASE_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${
 const MODELS_WS_BASE_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:${BACKEND_PORT}/ws/models`
 const SKILLS_WS_BASE_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:${BACKEND_PORT}/ws/skills`
 const PROJECTS_STORAGE_KEY = 'agent-projects'
+const TOOLS_HIDDEN_STORAGE_KEY = 'agent-tools-hidden'
 
 function loadProjects(): Project[] {
   try {
@@ -42,6 +43,10 @@ function loadProjects(): Project[] {
   }
 }
 
+function loadToolsHidden(): boolean {
+  return localStorage.getItem(TOOLS_HIDDEN_STORAGE_KEY) === 'true'
+}
+
 export default function HomePage() {
   const [projects, setProjects] = useState<Project[]>(loadProjects)
   const [activePath, setActivePath] = useState<string | null>(null)
@@ -49,7 +54,7 @@ export default function HomePage() {
   const [sessionRefreshVersion, setSessionRefreshVersion] = useState(0)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [toolsHidden, setToolsHidden] = useState(false)
+  const [toolsHidden, setToolsHidden] = useState(loadToolsHidden)
   const [totalToken, setTotalToken] = useState(0)
   const [models, setModels] = useState<ModelSummary[]>([])
   const [skills, setSkills] = useState<SkillEntry[]>([])
@@ -57,6 +62,7 @@ export default function HomePage() {
   const [projectFiles, setProjectFiles] = useState<ProjectFileEntry[]>([])
   const [connected, setConnected] = useState(false)
   const [waiting, setWaiting] = useState(false)
+  const [completedMessageId, setCompletedMessageId] = useState<string | null>(null)
   const [startingSession, setStartingSession] = useState(false)
   const socketRef = useRef<WebSocket | null>(null)
   const inputBoxRef = useRef<InputBoxHandle | null>(null)
@@ -93,6 +99,10 @@ export default function HomePage() {
   useEffect(() => {
     localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects))
   }, [projects])
+
+  useEffect(() => {
+    localStorage.setItem(TOOLS_HIDDEN_STORAGE_KEY, String(toolsHidden))
+  }, [toolsHidden])
 
   useEffect(() => {
     function handleGlobalKeyDown(event: KeyboardEvent) {
@@ -191,6 +201,7 @@ export default function HomePage() {
     setActiveSessionFile(response.data.sessionFile)
     setMessages(response.data.messages)
     setTotalToken(response.data.totalToken)
+    setCompletedMessageId(null)
     setWaiting(false)
     activeMessageIdRef.current = null
     messageCreatedAtRef.current.clear()
@@ -287,6 +298,7 @@ export default function HomePage() {
         : item))
       messageCreatedAtRef.current.delete(event.messageId)
       activeMessageIdRef.current = null
+      setCompletedMessageId(event.messageId)
       setTotalToken(event.totalToken)
       setWaiting(false)
       return
@@ -326,6 +338,7 @@ export default function HomePage() {
       socketRef.current?.close()
       setMessages([])
       setTotalToken(0)
+      setCompletedMessageId(null)
       setActiveSessionFile(response.data.sessionFile)
       setSessionRefreshVersion((current) => current + 1)
       setWaiting(false)
@@ -398,7 +411,11 @@ export default function HomePage() {
           <strong>{activePath ?? '请在侧边栏创建或选择一个项目'}</strong>
           <span>{activePath ? (connected ? '已连接' : '连接中…') : '未选择项目'}</span>
         </header>
-        <MessageArea messages={messages} toolsHidden={toolsHidden} />
+        <MessageArea
+          messages={messages}
+          toolsHidden={toolsHidden}
+          completedMessageId={completedMessageId}
+        />
         <SessionInfo
           modelName={activeModelName}
           responding={responding}
