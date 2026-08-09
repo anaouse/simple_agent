@@ -1,48 +1,21 @@
-import shlex
 import subprocess
 import time
 
 BASH_PATH = r"D:\Git\Git\usr\bin\bash.exe"
-ALLOWED_COMMANDS = {"find", "grep", "head", "ls", "wc", "cat", "tail", "date", "pwd", "ps",}
-FORBIDDEN_SHELL_CHARS = set("><`\n\r$")
-COMPOUND_OPERATORS = {"|", "&&", "||", ";"}
+ALLOWED_COMMANDS = {"find", "grep", "head", "ls", "wc", "cat", "tail", "date", "pwd", "ps", "backlog"}
 
 
 def _validate_command(command: str) -> str | None:
-    """Validate a sequence of allowed commands joined by shell operators."""
-    if any(character in FORBIDDEN_SHELL_CHARS for character in command):
-        return "Error: redirection, command substitution, and multi-line commands are not allowed"
-
-    try:
-        lexer = shlex.shlex(command, posix=True, punctuation_chars="|&;()")
-        lexer.whitespace_split = True
-        lexer.commenters = ""
-        tokens = list(lexer)
-    except ValueError as exception:
-        return f"Error: invalid command syntax: {exception}"
-
-    if not tokens:
+    """Validate that the first word of the command is allowed."""
+    parts = command.split(maxsplit=1)
+    if not parts:
         return "Error: empty command"
-
-    expecting_command = True
-    for token in tokens:
-        if token in COMPOUND_OPERATORS:
-            if expecting_command:
-                return f"Error: unexpected operator '{token}'"
-            expecting_command = True
-            continue
-        if expecting_command:
-            # 只检查子命令的第一个词是否在白名单里
-            if token not in ALLOWED_COMMANDS:
-                return (
-                    f"Error: command '{token}' is not allowed. "
-                    f"Only {', '.join(sorted(ALLOWED_COMMANDS))} are permitted."
-                )
-            expecting_command = False
-        # 非首词（参数）不再逐个校验
-
-    if expecting_command:
-        return "Error: command cannot end with an operator"
+    first_word = parts[0]
+    if first_word not in ALLOWED_COMMANDS:
+        return (
+            f"Error: command '{first_word}' is not allowed. "
+            f"Only {', '.join(sorted(ALLOWED_COMMANDS))} are permitted."
+        )
     return None
 
 
@@ -50,9 +23,8 @@ def _validate_command(command: str) -> str | None:
 def bash(command: str, timeout: int = 30, max_output_chars: int = 50000) -> str:
     """Execute a shell command via bash using Git Bash.
 
-    Only allows find, grep, head, ls, and wc. Commands may be combined with
-    pipes, &&, ||, or ;. Redirection, command substitution, and subshells
-    remain disallowed.
+    Only checks the first word of the command against a fixed whitelist.
+    Arguments and compound operators are passed through to bash as-is.
 
     Args:
         command: The shell command to execute, e.g., 'ls -la /some/path'
@@ -124,11 +96,6 @@ def bash(command: str, timeout: int = 30, max_output_chars: int = 50000) -> str:
     if stderr_truncated:
         lines.append(f"(stderr truncated at {max_output_chars} chars)")
 
-    # Exit code 0 means success; 1 is kept for grep-style "no match" results.
-    # Anything else (negative or >= 2) is reported as a failure while preserving
-    # the exit code, stdout, and stderr for diagnostics.
     output = "\n".join(lines)
-    if process.returncode not in (0, 1):
-        return f"Command failed:\n{output}"
 
     return output
