@@ -98,3 +98,11 @@ edit() got an unexpected keyword argument '_invalid_json'
 
 以上修改只是让edit调用的时候错误可以写到日志而已，接下来应该查看日志然后看看具体是什么样。
 
+一类报错，json当中不加入引号
+
+```
+{"path": "D:/projects/agent/dumb/agent.py", "old_text": ACTIVE_CHATS: dict[str, asyncio.Task[None]] = {}, "new_text": # test edit tool marker
+ACTIVE_CHATS: dict[str, asyncio.Task[None]] = {}}
+```
+
+现在做法是系统提示词再强调一次，还不确定是否管用，之后试用之后再来更新记录
