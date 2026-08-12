@@ -214,8 +214,14 @@ class OpenAIAgent:
             # Parse arguments
             try:
                 arguments = json.loads(arguments_str)
-            except json.JSONDecodeError:
+                input_error = None
+            except json.JSONDecodeError as exception:
+                logger.error(
+                    "Invalid tool call JSON for {}: {}\nraw arguments: {}",
+                    tool_name, exception, arguments_str,
+                )
                 arguments = {}
+                input_error = str(exception)
 
             function = self._tool_functions.get(tool_name)
             parsed_arguments = arguments if isinstance(arguments, dict) else {}
@@ -230,6 +236,12 @@ class OpenAIAgent:
             is_error = False
             if function is None:
                 result = f"Error: unknown tool '{tool_name}'"
+                is_error = True
+            elif input_error is not None:
+                result = (
+                    f"Error: tool '{tool_name}' received invalid JSON arguments: "
+                    f"{input_error}"
+                )
                 is_error = True
             elif not isinstance(arguments, dict):
                 result = "Error: tool arguments must be an object"

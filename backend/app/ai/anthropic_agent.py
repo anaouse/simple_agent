@@ -95,6 +95,7 @@ class AnthropicAgent:
                     "usage": {},
                 }
                 tool_json: dict[int, list[str]] = {}
+                invalid_tool_inputs: dict[str, str] = {}
 
                 async for event in stream:
                     if event.type == "content_block_start":
@@ -134,11 +135,16 @@ class AnthropicAgent:
 
                 for index, raw_json in tool_json.items():
                     block = final_message["content"][index]
+                    raw = "".join(raw_json)
                     try:
-                        block["input"] = json.loads("".join(raw_json))
+                        block["input"] = json.loads(raw)
                     except json.JSONDecodeError as exception:
-                        logger.error("Invalid tool call JSON for {}: {}", block["name"], exception)
-                        block["input"] = {"_invalid_json": str(exception)}
+                        logger.error(
+                            "Invalid tool call JSON for {}: {}\nraw arguments: {}",
+                            block["name"], exception, raw,
+                        )
+                        block["input"] = {}
+                        invalid_tool_inputs[str(block.get("id", ""))] = str(exception)
 
                 logger.info("Upstream API call completed")
                 usage = final_message["usage"]
@@ -154,7 +160,7 @@ class AnthropicAgent:
                 if final_message.get("stop_reason") != "tool_use":
                     break
 
-                async for tool_event in self._execute_tools(assistant_message):
+                async for tool_event in self._execute_tools(assistant_message, invalid_tool_inputs):
                     if tool_event["type"] == "tool_result_internal":
                         self._messages.append(tool_event["message"])
                     else:
@@ -167,7 +173,9 @@ class AnthropicAgent:
         return self._total_token
 
     async def _execute_tools(
-        self, assistant_message: dict[str, object]
+        self,
+        assistant_message: dict[str, object],
+        invalid_tool_inputs: dict[str, str] | None = None,
     ) -> AsyncIterator["AgentEvent | InternalToolResultEvent"]:
         result_blocks: list[dict[str, object]] = []
         content = assistant_message.get("content", [])
@@ -183,6 +191,7 @@ class AnthropicAgent:
             tool_input = block.get("input", {})
             function = self._tool_functions.get(tool_name)
             arguments = tool_input if isinstance(tool_input, dict) else {}
+            input_error = (invalid_tool_inputs or {}).get(tool_use_id)
             logger.info("Tool call arguments completed: {} | {}", tool_name, arguments)
             yield {
                 "type": "tool_call_arguments",
@@ -194,6 +203,12 @@ class AnthropicAgent:
             is_error = False
             if function is None:
                 result = f"Error: unknown tool '{tool_name}'"
+                is_error = True
+            elif input_error is not None:
+                result = (
+                    f"Error: tool '{tool_name}' received invalid JSON arguments: "
+                    f"{input_error}"
+                )
                 is_error = True
             elif not isinstance(tool_input, dict):
                 result = "Error: tool input must be an object"
