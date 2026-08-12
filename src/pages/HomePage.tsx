@@ -106,6 +106,11 @@ export default function HomePage() {
 
   useEffect(() => {
     function handleGlobalKeyDown(event: KeyboardEvent) {
+      if (event.ctrlKey && event.key === '\\') {
+        event.preventDefault()
+        setSidebarCollapsed((current) => !current)
+        return
+      }
       if (
         event.key !== '/'
         || event.ctrlKey
@@ -394,18 +399,6 @@ export default function HomePage() {
 
   return (
     <div className="app-shell">
-      <ProjectSidebar
-        activePath={activePath}
-        activeSessionFile={activeSessionFile}
-        collapsed={sidebarCollapsed}
-        onAdd={addProject}
-        onRemove={removeProject}
-        onSelect={selectProject}
-        onSelectSession={selectSession}
-        onToggle={() => setSidebarCollapsed((current) => !current)}
-        projects={projects}
-        sessionRefreshVersion={sessionRefreshVersion}
-      />
       <div className="home-page">
         <header className="home-page__header">
           <strong>{activePath ?? '请在侧边栏创建或选择一个项目'}</strong>
@@ -437,6 +430,18 @@ export default function HomePage() {
           onStop={stop}
         />
       </div>
+      <ProjectSidebar
+        activePath={activePath}
+        activeSessionFile={activeSessionFile}
+        collapsed={sidebarCollapsed}
+        onAdd={addProject}
+        onRemove={removeProject}
+        onSelect={selectProject}
+        onSelectSession={selectSession}
+        onToggle={() => setSidebarCollapsed((current) => !current)}
+        projects={projects}
+        sessionRefreshVersion={sessionRefreshVersion}
+      />
     </div>
   )
 }

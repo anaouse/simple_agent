@@ -1,8 +1,11 @@
+import shlex
 import subprocess
 import time
 
+from app.tools.security import get_project_root
+
 BASH_PATH = r"D:\Git\Git\usr\bin\bash.exe"
-ALLOWED_COMMANDS = {"find", "grep", "head", "ls", "wc", "cat", "tail", "date", "pwd", "ps", "backlog"}
+ALLOWED_COMMANDS = {"find", "grep", "head", "ls", "wc", "cat", "tail", "date", "pwd", "ps", "simple_task"}
 
 
 def _validate_command(command: str) -> str | None:
@@ -24,10 +27,13 @@ def bash(command: str, timeout: int = 30, max_output_chars: int = 50000) -> str:
     """Execute a shell command via bash using Git Bash.
 
     Only checks the first word of the command against a fixed whitelist.
-    Arguments and compound operators are passed through to bash as-is.
+    Allowed commands: cat, date, find, grep, head, ls, ps, tail, wc, pwd, and
+    simple_task. Arguments and compound operators are passed through to bash as-is.
 
     Args:
-        command: The shell command to execute, e.g., 'ls -la /some/path'
+        command: The shell command to execute. The first command must be one of
+            cat, date, find, grep, head, ls, ps, tail, wc, or backlog; for
+            example, 'ls -la /some/path'.
         timeout: Maximum seconds to wait for the command; defaults to 30
         max_output_chars: Maximum characters for stdout/stderr each; defaults to 50000
     """
@@ -38,10 +44,15 @@ def bash(command: str, timeout: int = 30, max_output_chars: int = 50000) -> str:
     if validation_error:
         return validation_error
 
+    project_root = get_project_root()
+    command_to_run = command_stripped
+    if project_root is not None:
+        command_to_run = f"cd -- {shlex.quote(project_root.as_posix())} && {command_stripped}"
+
     process = None
     try:
         process = subprocess.Popen(
-            [BASH_PATH, "-c", command_stripped],
+            [BASH_PATH, "-c", command_to_run],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,

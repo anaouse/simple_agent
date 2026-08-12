@@ -3,7 +3,7 @@
   width: 320px;
   min-width: 320px;
   height: 100%;
-  border-right: 1px solid var(--color-border);
+  border-left: 1px solid var(--color-border);
   background: var(--color-surface-muted);
   transition: width 160ms ease, min-width 160ms ease;
 }
@@ -17,7 +17,7 @@
   position: absolute;
   z-index: 1;
   top: 18px;
-  right: -14px;
+  left: -14px;
   width: 28px;
   height: 32px;
   padding: 0;

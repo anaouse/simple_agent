@@ -64,7 +64,7 @@ export default function ProjectSidebar({
         onClick={onToggle}
         type="button"
       >
-        {collapsed ? '›' : '‹'}
+        {collapsed ? '‹' : '›'}
       </button>
       {!collapsed && (
         <div className="project-sidebar__content">

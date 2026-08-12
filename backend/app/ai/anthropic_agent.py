@@ -285,10 +285,20 @@ class AnthropicAgent:
 
     def _build_system_prompt(self, base_prompt: str | None) -> str:
         """Add the active project path to the configured system prompt."""
-        project_section = (
-            "# 目前所在目录\n\n"
-            f"当前工作目录是 `{self._project_path.as_posix()}`。write 和 edit 仅可操作该目录及其子目录；read、walk 以及 bash 中允许的 ls、grep、find 可访问进程权限允许的其他路径。bash 仅允许执行 ls、grep、find，且不要使用复合命令。"
-        )
+        project_section = f"""# Agent 内部约定
+
+## 当前项目
+
+当前工作目录是 `{self._project_path.as_posix()}`。
+
+- `write` 和 `edit` 仅可操作当前项目目录及其子目录。
+- `read`、`walk` 以及 `bash` 可访问进程权限允许的其他路径。
+- `bash` 仅允许使用工具白名单中的命令；命令的第一个单词必须是白名单命令，参数和复合命令按原样执行。
+- 如果项目中存在 `AGENTS.md` 文件，必须先阅读。
+
+## 公式输出
+
+需要输出数学公式时，必须使用 Markdown 数学定界符 `$$`：行内公式和块级公式都使用 `$$` 包裹。不要使用 `\\(`、`\\)`、`\\[`、`\\]` 或单个 `$`。"""
         if not base_prompt:
             return project_section
         lines = base_prompt.splitlines()
