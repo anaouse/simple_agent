@@ -1,3 +1,4 @@
+import os
 import shlex
 import subprocess
 import time
@@ -5,20 +6,12 @@ import time
 from app.tools.security import get_project_root
 
 BASH_PATH = r"D:\Git\Git\usr\bin\bash.exe"
-ALLOWED_COMMANDS = {"find", "grep", "head", "ls", "wc", "cat", "tail", "date", "pwd", "ps", "simple_task"}
 
 
 def _validate_command(command: str) -> str | None:
-    """Validate that the first word of the command is allowed."""
-    parts = command.split(maxsplit=1)
-    if not parts:
-        return "Error: empty command"
-    first_word = parts[0]
-    if first_word not in ALLOWED_COMMANDS:
-        return (
-            f"Error: command '{first_word}' is not allowed. "
-            f"Only {', '.join(sorted(ALLOWED_COMMANDS))} are permitted."
-        )
+    """Reject commands that operate on .git folders."""
+    if ".git" in command:
+        return "Error: 任何命令都不能作用于 git 文件夹"
     return None
 
 
@@ -26,14 +19,11 @@ def _validate_command(command: str) -> str | None:
 def bash(command: str, timeout: int = 30, max_output_chars: int = 50000) -> str:
     """Execute a shell command via bash using Git Bash.
 
-    Only checks the first word of the command against a fixed whitelist.
-    Allowed commands: cat, date, find, grep, head, ls, ps, tail, wc, pwd, and
-    simple_task. Arguments and compound operators are passed through to bash as-is.
+    Commands are executed as-is without a whitelist; only commands that
+    operate on .git folders are rejected.
 
     Args:
-        command: The shell command to execute. The first command must be one of
-            cat, date, find, grep, head, ls, ps, tail, wc, or backlog; for
-            example, 'ls -la /some/path'.
+        command: The shell command to execute.
         timeout: Maximum seconds to wait for the command; defaults to 30
         max_output_chars: Maximum characters for stdout/stderr each; defaults to 50000
     """
@@ -49,10 +39,17 @@ def bash(command: str, timeout: int = 30, max_output_chars: int = 50000) -> str:
     if project_root is not None:
         command_to_run = f"cd -- {shlex.quote(project_root.as_posix())} && {command_stripped}"
 
+    # 清理后端 uv 环境相关的环境变量，避免子进程 bash 继承 backend/.venv
+    env = os.environ.copy()
+    env.pop("VIRTUAL_ENV", None)
+    paths = [p for p in env["PATH"].split(os.pathsep) if "backend/.venv" not in p]
+    env["PATH"] = os.pathsep.join(paths)
+
     process = None
     try:
         process = subprocess.Popen(
             [BASH_PATH, "-c", command_to_run],
+            env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,

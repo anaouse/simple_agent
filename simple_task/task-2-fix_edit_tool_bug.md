@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-13T00:27:46+08:00
-status: todo # done | todo
+status: done # done | todo
 ---
 
 # 状况描述
@@ -106,3 +106,5 @@ ACTIVE_CHATS: dict[str, asyncio.Task[None]] = {}}
 ```
 
 现在做法是系统提示词再强调一次，还不确定是否管用，之后试用之后再来更新记录
+
+还是不行，把edit改为非list修改就好了，看task3,还是task4来着。
