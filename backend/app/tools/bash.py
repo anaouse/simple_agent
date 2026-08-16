@@ -9,9 +9,15 @@ BASH_PATH = r"D:\Git\Git\usr\bin\bash.exe"
 
 
 def _validate_command(command: str) -> str | None:
-    """Reject commands that operate on .git folders."""
+    """Reject commands that operate on .git folders or use rm."""
     if ".git" in command:
         return "Error: 任何命令都不能作用于 git 文件夹"
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        tokens = command.split()
+    if any(token == "rm" for token in tokens):
+        return "Error: 不要使用 rm 命令，即使看起来没用的文件也保留着"
     return None
 
 
@@ -20,7 +26,7 @@ def bash(command: str, timeout: int = 30, max_output_chars: int = 50000) -> str:
     """Execute a shell command via bash using Git Bash.
 
     Commands are executed as-is without a whitelist; only commands that
-    operate on .git folders are rejected.
+    operate on .git folders or use rm are rejected.
 
     Args:
         command: The shell command to execute.
