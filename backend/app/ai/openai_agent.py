@@ -77,8 +77,12 @@ class OpenAIAgent:
         """Load conversation history from persisted messages."""
         self._messages = OpenAISessionAdaptor.to_openai(messages)
 
-    async def reply(self, user_content: str) -> AsyncIterator["AgentEvent"]:
+    async def reply(
+        self, user_content: str, attachments: list[object] | None = None
+    ) -> AsyncIterator["AgentEvent"]:
         """Generate a reply to the user message, yielding events as they occur."""
+        if attachments:
+            raise ValueError("OpenAI 图片支持暂未实现")
         set_project_root(self._project_path)
         self._messages.append({"role": "user", "content": user_content})
 

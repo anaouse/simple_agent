@@ -47,6 +47,7 @@ from app.models import (
     ToolCallResultEvent,
     ToolCallStartEvent,
     UserMessageEvent,
+    UserMessageRejectedEvent,
 )
 
 ACTIVE_CHATS: dict[str, asyncio.Task[None]] = {}
@@ -419,12 +420,19 @@ async def chat(
 
             logger.info("User message received")
             content = resolve_skill_message(message.content)
+            attachments = message.attachments
             message_id = str(uuid4())
             created_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
-            session.append_user(content)
+            marker = len(session.messages)
+            user_message_id = session.append_user(content, attachments)
             await send_event(
                 websocket,
-                UserMessageEvent(content=content, created_at=created_at),
+                UserMessageEvent(
+                    id=user_message_id,
+                    content=content,
+                    attachments=attachments,
+                    created_at=created_at,
+                ),
             )
             await send_event(
                 websocket,
@@ -432,7 +440,7 @@ async def chat(
             )
 
             try:
-                async for event in agent.reply(content):
+                async for event in agent.reply(content, attachments):
                     if event["type"] == "content_delta":
                         session.append_delta(message_id, event["delta"], created_at)
                         await send_event(
@@ -496,7 +504,23 @@ async def chat(
                 toast("Simple Agent", "模型回答已结束", app_id="Simple Agent")
             except WebSocketDisconnect:
                 raise
-            except Exception:
+            except Exception as exception:
+                if attachments and getattr(exception, "status_code", None) == 400:
+                    session.truncate(marker)
+                    agent.load_session(session.messages)
+                    await send_event(
+                        websocket,
+                        UserMessageRejectedEvent(
+                            message_id=user_message_id,
+                            content=content,
+                            attachments=attachments,
+                            error=ErrorBody(
+                                code="IMAGE_NOT_SUPPORTED",
+                                message="该模型不支持图片输入",
+                            ),
+                        ),
+                    )
+                    continue
                 session.interrupt()
                 session.save()
                 await send_event(

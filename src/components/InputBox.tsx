@@ -1,8 +1,10 @@
-import { ChangeEvent, forwardRef, FormEvent, KeyboardEvent, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import type { ModelSummary, ProjectFileEntry, SkillEntry } from '@/types'
+import { ChangeEvent, ClipboardEvent, forwardRef, FormEvent, KeyboardEvent, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import Attachments from '@/components/Attachments'
+import type { Attachment, ModelSummary, ProjectFileEntry, SkillEntry } from '@/types'
 
 interface InputBoxProps {
   disabled: boolean
+  error: string | null
   files: ProjectFileEntry[]
   models: ModelSummary[]
   skills: SkillEntry[]
@@ -10,7 +12,7 @@ interface InputBoxProps {
   waiting: boolean
   onModelSelect: (modelName: string) => void
   onNewSession: () => void
-  onSend: (content: string) => void
+  onSend: (content: string, attachments: Attachment[]) => void
   onStop: () => void
 }
 
@@ -31,10 +33,12 @@ const MAX_RESULTS = 30
 
 export interface InputBoxHandle {
   focus: () => boolean
+  restore: (content: string, attachments: Attachment[]) => void
 }
 
 const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox({
   disabled,
+  error,
   files,
   models,
   skills,
@@ -48,6 +52,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox({
   const [content, setContent] = useState('')
   const [cursor, setCursor] = useState(0)
   const [activeIndex, setActiveIndex] = useState(0)
+  const [attachments, setAttachments] = useState<Attachment[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const activeSuggestionRef = useRef<HTMLButtonElement>(null)
   const atQuery = findAtQuery(content, cursor)
@@ -65,6 +70,19 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox({
       if (disabled) return false
       requestAnimationFrame(() => textareaRef.current?.focus())
       return true
+    },
+    restore(nextContent: string, nextAttachments: Attachment[]) {
+      setContent(nextContent)
+      setAttachments(nextAttachments)
+      setCursor(nextContent.length)
+      setActiveIndex(0)
+      requestAnimationFrame(() => {
+        const element = textareaRef.current
+        if (!element) return
+        element.focus()
+        element.setSelectionRange(nextContent.length, nextContent.length)
+        autoGrow(element)
+      })
     },
   }), [disabled])
 
@@ -114,14 +132,17 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox({
 
   function send() {
     const value = content.trim()
-    if (!value || disabled) return
-    if (value === '/model' || value === '/skill') return
-    if (value.startsWith('/model ')) {
-      const modelName = value.slice('/model '.length).trim()
-      if (models.some((model) => model.name === modelName)) selectModel(modelName)
-      return
+    const hasAttachments = attachments.length > 0
+    if ((!value && !hasAttachments) || disabled) return
+    if (!hasAttachments) {
+      if (value === '/model' || value === '/skill') return
+      if (value.startsWith('/model ')) {
+        const modelName = value.slice('/model '.length).trim()
+        if (models.some((model) => model.name === modelName)) selectModel(modelName)
+        return
+      }
     }
-    onSend(value)
+    onSend(value, attachments)
     clearInput()
   }
 
@@ -158,6 +179,28 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox({
     autoGrow(event.target)
   }
 
+  function handlePaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const files = Array.from(event.clipboardData?.items ?? [])
+      .filter((item) => item.type.startsWith('image/'))
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => file !== null)
+    if (files.length === 0) return
+    event.preventDefault()
+    for (const file of files) {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const dataUrl = typeof reader.result === 'string' ? reader.result : ''
+        const match = dataUrl.match(/^data:([^;]+);base64,(.*)$/)
+        if (!match) return
+        setAttachments((current) => [
+          ...current,
+          { mediaType: match[1], data: match[2] },
+        ])
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
   function handleKeyUp(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (['ArrowUp', 'ArrowDown', 'Enter', 'Tab'].includes(event.key)) return
     syncCursor()
@@ -187,6 +230,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox({
     setContent('')
     setCursor(0)
     setActiveIndex(0)
+    setAttachments([])
     resetHeight()
   }
 
@@ -236,6 +280,13 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox({
             ))}
           </div>
         )}
+        {error && <div className="input-box__error">{error}</div>}
+        {attachments.length > 0 && (
+          <Attachments
+            attachments={attachments}
+            onRemove={(index) => setAttachments((current) => current.filter((_, i) => i !== index))}
+          />
+        )}
         <textarea
           aria-label="消息"
           disabled={disabled}
@@ -243,6 +294,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox({
           onClick={syncCursor}
           onKeyDown={handleKeyDown}
           onKeyUp={handleKeyUp}
+          onPaste={handlePaste}
           placeholder="输入消息，使用 @ 引用文件或 / 执行命令…"
           ref={textareaRef}
           rows={1}
@@ -254,7 +306,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox({
           停止
         </button>
       ) : (
-        <button disabled={disabled || !content.trim()} type="submit">
+        <button disabled={disabled || (!content.trim() && attachments.length === 0)} type="submit">
           发送
         </button>
       )}

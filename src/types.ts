@@ -42,6 +42,7 @@ interface BaseChatMessage {
 export interface TextChatMessage extends BaseChatMessage {
   role: 'user' | 'assistant'
   content: string
+  attachments?: Attachment[]
   parentMessageId?: string
 }
 
@@ -55,9 +56,15 @@ export interface ToolChatMessage extends BaseChatMessage {
 
 export type ChatMessage = TextChatMessage | ToolChatMessage
 
+export interface Attachment {
+  mediaType: string
+  data: string
+}
+
 export interface ClientMessage {
   type: 'message'
   content: string
+  attachments?: Attachment[]
 }
 
 export interface ProjectFileEntry {
@@ -109,7 +116,9 @@ export interface InterruptSessionResponse {
 
 export interface UserMessageEvent {
   type: 'user_message'
+  id: string
   content: string
+  attachments: Attachment[]
   createdAt: string
 }
 
@@ -164,6 +173,14 @@ export interface ErrorEvent {
   error: ErrorBody
 }
 
+export interface UserMessageRejectedEvent {
+  type: 'user_message_rejected'
+  messageId: string
+  content: string
+  attachments: Attachment[]
+  error: ErrorBody
+}
+
 export type ServerEvent =
   | UserMessageEvent
   | MessageStartEvent
@@ -172,4 +189,5 @@ export type ServerEvent =
   | ToolCallArgumentsEvent
   | ToolCallResultEvent
   | MessageEndEvent
+  | UserMessageRejectedEvent
   | ErrorEvent

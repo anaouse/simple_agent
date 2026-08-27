@@ -9,9 +9,15 @@ class ApiModel(BaseModel):
     ), populate_by_name=True)
 
 
+class Attachment(ApiModel):
+    media_type: str = Field(min_length=1)
+    data: str = Field(min_length=1)
+
+
 class ClientMessage(ApiModel):
     type: Literal["message"]
-    content: str = Field(min_length=1, max_length=100_000)
+    content: str = Field(default="", max_length=100_000)
+    attachments: list[Attachment] = Field(default_factory=list)
 
 
 class ModelSummary(ApiModel):
@@ -74,6 +80,7 @@ class BaseChatMessage(ApiModel):
 class TextChatMessage(BaseChatMessage):
     role: Literal["user", "assistant"]
     content: str
+    attachments: list[Attachment] | None = None
     parent_message_id: str | None = None
 
 
@@ -135,7 +142,9 @@ class NewSessionResponse(ApiModel):
 
 class UserMessageEvent(ApiModel):
     type: Literal["user_message"] = "user_message"
+    id: str
     content: str
+    attachments: list[Attachment] = Field(default_factory=list)
     created_at: str
 
 
@@ -191,4 +200,12 @@ class ErrorResponse(ApiModel):
 
 class ErrorEvent(ApiModel):
     type: Literal["error"] = "error"
+    error: ErrorBody
+
+
+class UserMessageRejectedEvent(ApiModel):
+    type: Literal["user_message_rejected"] = "user_message_rejected"
+    message_id: str
+    content: str
+    attachments: list[Attachment] = Field(default_factory=list)
     error: ErrorBody

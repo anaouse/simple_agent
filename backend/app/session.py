@@ -6,7 +6,14 @@ from uuid import uuid4
 
 from loguru import logger
 
-from app.models import CHAT_MESSAGE_ADAPTER, ChatMessage, SessionStorage, TextChatMessage, ToolChatMessage
+from app.models import (
+    CHAT_MESSAGE_ADAPTER,
+    Attachment,
+    ChatMessage,
+    SessionStorage,
+    TextChatMessage,
+    ToolChatMessage,
+)
 
 _INTERRUPTED_TEXT = "\n\n[用户中断了本次回答]"
 _INTERRUPTED_RESULT = "用户中断"
@@ -95,17 +102,22 @@ class ConversationSession:
         self.total_token = total_token
         self._dirty = True
 
-    def append_user(self, content: str) -> None:
+    def append_user(
+        self, content: str, attachments: list[Attachment] | None = None
+    ) -> str:
         self._dirty = True
+        message_id = str(uuid4())
         self.messages.append(
             TextChatMessage(
-                id=str(uuid4()),
+                id=message_id,
                 role="user",
                 content=content,
+                attachments=attachments or [],
                 status="complete",
                 created_at=datetime.now().astimezone().isoformat(),
             )
         )
+        return message_id
 
     def append_delta(self, message_id: str, content: str, created_at: str) -> None:
         self._dirty = True
@@ -174,6 +186,11 @@ class ConversationSession:
             if message.parent_message_id == message_id and message.status == "streaming":
                 message.status = "complete"
                 self._dirty = True
+
+    def truncate(self, count: int) -> None:
+        if len(self.messages) > count:
+            self.messages = self.messages[:count]
+            self._dirty = True
 
     def interrupt(self) -> None:
         for message in self.messages:

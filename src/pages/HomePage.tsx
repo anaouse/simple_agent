@@ -5,6 +5,7 @@ import MessageArea from '@/components/MessageArea'
 import ProjectSidebar from '@/components/ProjectSidebar'
 import SessionInfo from '@/components/SessionInfo'
 import type {
+  Attachment,
   ChatMessage,
   ClientMessage,
   ModelSummary,
@@ -62,6 +63,7 @@ export default function HomePage() {
   const [projectFiles, setProjectFiles] = useState<ProjectFileEntry[]>([])
   const [connected, setConnected] = useState(false)
   const [waiting, setWaiting] = useState(false)
+  const [inputError, setInputError] = useState<string | null>(null)
   const [completedMessageId, setCompletedMessageId] = useState<string | null>(null)
   const [startingSession, setStartingSession] = useState(false)
   const socketRef = useRef<WebSocket | null>(null)
@@ -237,12 +239,25 @@ export default function HomePage() {
   function handleEvent(event: ServerEvent) {
     if (event.type === 'user_message') {
       setMessages((current) => [...current, {
-        id: crypto.randomUUID(),
+        id: event.id,
         role: 'user',
         content: event.content,
+        attachments: event.attachments,
         status: 'complete',
         createdAt: event.createdAt,
       }])
+      return
+    }
+    if (event.type === 'user_message_rejected') {
+      setMessages((current) => current.filter((message) => message.id !== event.messageId))
+      const rejectedId = activeMessageIdRef.current
+      if (rejectedId) {
+        messageCreatedAtRef.current.delete(rejectedId)
+        activeMessageIdRef.current = null
+      }
+      setWaiting(false)
+      setInputError(event.error.message)
+      inputBoxRef.current?.restore(event.content, event.attachments)
       return
     }
     if (event.type === 'message_start') {
@@ -389,11 +404,12 @@ export default function HomePage() {
     connect(activePath, activeSessionFile)
   }
 
-  function send(content: string) {
+  function send(content: string, attachments: Attachment[]) {
     const socket = socketRef.current
     if (!socket || socket.readyState !== WebSocket.OPEN || !activePath) return
-    const message: ClientMessage = { type: 'message', content }
+    const message: ClientMessage = { type: 'message', content, attachments }
     setWaiting(true)
+    setInputError(null)
     socket.send(JSON.stringify(message))
   }
 
@@ -418,6 +434,7 @@ export default function HomePage() {
         />
         <InputBox
           disabled={!activePath || !connected || responding || startingSession}
+          error={inputError}
           ref={inputBoxRef}
           files={projectFiles}
           models={models}

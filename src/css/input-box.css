@@ -90,3 +90,25 @@
   cursor: not-allowed;
   opacity: 0.55;
 }
+
+.input-box__error {
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-error-border);
+  border-radius: 6px;
+  background: var(--color-error-background);
+  color: var(--color-error);
+  font-size: 13px;
+}
+
+.input-box .attachment__remove {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1;
+}

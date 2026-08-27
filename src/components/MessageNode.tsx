@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Streamdown } from 'streamdown'
 import { createMathPlugin } from '@streamdown/math'
 import { code } from '@streamdown/code'
+import Attachments from '@/components/Attachments'
 import type { ChatMessage } from '@/types'
 
 interface MessageNodeProps {
@@ -22,11 +23,19 @@ function statusText(message: ChatMessage, expanded: boolean) {
 }
 
 function messagePreview(message: ChatMessage) {
-  const content = message.role === 'tool'
-    ? message.result || JSON.stringify(message.arguments)
-    : message.content
-  const normalized = content.replace(/\s+/g, ' ').trim()
-  return normalized.length > 80 ? `${normalized.slice(0, 80)}…` : normalized
+  if (message.role === 'tool') {
+    const content = message.result || JSON.stringify(message.arguments)
+    const normalized = content.replace(/\s+/g, ' ').trim()
+    return normalized.length > 80 ? `${normalized.slice(0, 80)}…` : normalized
+  }
+  const parts: string[] = []
+  const text = message.content.replace(/\s+/g, ' ').trim()
+  if (text) parts.push(text)
+  if (message.role === 'user' && message.attachments?.length) {
+    parts.push(`[${message.attachments.length} 张图片]`)
+  }
+  const label = parts.join(' ')
+  return label.length > 80 ? `${label.slice(0, 80)}…` : label
 }
 
 function copyContent(message: ChatMessage) {
@@ -92,7 +101,12 @@ export default function MessageNode({ message, expandSignal }: MessageNodeProps)
               {message.content || '…'}
             </Streamdown>
           ) : (
-            <p>{message.content}</p>
+            <>
+              {message.content && <p>{message.content}</p>}
+              {message.attachments && message.attachments.length > 0 && (
+                <Attachments attachments={message.attachments} />
+              )}
+            </>
           )}
           {message.role !== 'tool' && message.status === 'error' && (
             <p className="message-node__error">生成失败</p>

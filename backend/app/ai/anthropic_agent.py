@@ -8,7 +8,7 @@ from loguru import logger
 
 from app.ai.anthropic_session_adaptor import AnthropicSessionAdaptor
 from app.config import AgentConfig, ModelConfig
-from app.models import ChatMessage
+from app.models import Attachment, ChatMessage
 from app.tools import bash, edit, read, walk, web_fetch, write
 from app.tools.security import set_project_root
 from app.tools.tool_utils import tools_from_functions
@@ -71,9 +71,11 @@ class AnthropicAgent:
     def load_session(self, messages: list[ChatMessage]) -> None:
         self._messages = AnthropicSessionAdaptor.to_anthropic(messages)
 
-    async def reply(self, user_content: str) -> AsyncIterator["AgentEvent"]:
+    async def reply(
+        self, user_content: str, attachments: list[Attachment] | None = None
+    ) -> AsyncIterator["AgentEvent"]:
         set_project_root(self._project_path)
-        self._messages.append({"role": "user", "content": user_content})
+        self._messages.append(self._build_user_message(user_content, attachments))
 
         try:
             while True:
@@ -168,6 +170,28 @@ class AnthropicAgent:
         except Exception:
             logger.exception("Agent reply failed")
             raise
+
+    @staticmethod
+    def _build_user_message(
+        user_content: str, attachments: list[Attachment] | None
+    ) -> dict[str, object]:
+        if not attachments:
+            return {"role": "user", "content": user_content}
+        blocks: list[dict[str, object]] = []
+        if user_content:
+            blocks.append({"type": "text", "text": user_content})
+        for attachment in attachments:
+            blocks.append(
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": attachment.media_type,
+                        "data": attachment.data,
+                    },
+                }
+            )
+        return {"role": "user", "content": blocks}
 
     def get_total_token(self) -> int:
         return self._total_token

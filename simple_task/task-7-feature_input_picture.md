@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-27T11:55:31+08:00
-status: todo # done | todo
+status: done # done | todo
 ---
 
 > 人下达task，你执行task并记录执行过程，人验收后记录验收看到的东西判断是否完成，你继续执行task，直到人认为结束了再手动修改status
@@ -85,3 +85,38 @@ auto    Automatic selection. Currently equivalent to original.
   "image_url": {"url": "https://example.com/image.jpg", "detail": "low"}
 }
 
+## 执行记录（第一轮）
+
+按讨论确认的方案完成图片输入功能，验证通过（backend import ok、`npm run build` ok）。
+
+### 后端
+- `models.py`：新增 `Attachment`；`ClientMessage` 增加 `attachments` 且 `content` 允许为空；`TextChatMessage` 增加可选 `attachments`；`UserMessageEvent` 增加 `id`、`attachments`；新增 `UserMessageRejectedEvent`。
+- `session.py`：`append_user` 接收并保存 `attachments`，返回消息 id；新增 `truncate`。
+- `main.py`：接收 `attachments`；`UserMessageEvent` 带后端生成的 id；捕获带图请求 400 时回滚 session、重建 agent 并发送 `UserMessageRejectedEvent`（"该模型不支持图片输入"），不自动重发。
+- `anthropic_agent.py`：`reply` 增加 `attachments`，有图时构造 text+image content blocks。
+- `anthropic_session_adaptor.py`：`to_anthropic` 把带图 user 消息还原为 blocks。
+- `openai_agent.py`：`reply` 增加 `attachments` 参数，带图时抛错（暂不实现）。
+
+### 前端
+- `types.ts`：新增 `Attachment`，相关事件/消息增加附件字段，新增 `UserMessageRejectedEvent`。
+- `Attachments.tsx`（新）：缩略图 + 点击放大 modal（Esc/点遮罩关闭）+ 可选删除，InputBox 与 MessageNode 共用。
+- `InputBox.tsx`：`onPaste` 抓取图片转 base64；附件展示/删除；`restore`；`error` 提示；允许只发图。
+- `MessageNode.tsx`：user 消息渲染附件（仅展示不可删），preview 追加图片数量。
+- `HomePage.tsx`：`send` 带 attachments；`user_message` 改用后端 id；处理 `user_message_rejected`（移除消息 + 恢复输入框 + 提示）。
+- CSS：新增 `attachments.css`，`input-box.css` 增加 error 与删除按钮覆盖样式。
+
+### 说明
+- 点击放大预览已一并实现。
+- 不做图片压缩，依赖 DeepSeek 服务端自动 resize。
+- assistant 消息的前端 id 本次未清理（按约定）。
+- OpenAI 协议图片未实现。
+
+## 验收反馈（第一轮）
+
+- ctrl+v 发送图片、历史记录恢复：通过。
+- 视觉模型读图、多图传输：通过。
+- 非视觉模型带图：服务端未返回 400，而是正常回复"看不到图片"。经排查，这是 DeepSeek 实际行为与文档"非 vision 模型返回 400"的描述不一致（服务端接受图片但不识别内容），非代码问题。代码仅在真正收到 400 时才回滚+提示，符合设计，不做改动。
+
+# 最终
+
+先觉得完成，之后如果有什么要修改的再改，基本功能用起来没问题了

@@ -30,7 +30,26 @@ class AnthropicSessionAdaptor:
             if message.role == "user":
                 flush_assistant()
                 flush_tool_results()
-                anthropic_messages.append({"role": "user", "content": message.content})
+                if message.attachments:
+                    blocks: list[dict[str, object]] = []
+                    if message.content:
+                        blocks.append({"type": "text", "text": message.content})
+                    for attachment in message.attachments:
+                        blocks.append(
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": attachment.media_type,
+                                    "data": attachment.data,
+                                },
+                            }
+                        )
+                    anthropic_messages.append({"role": "user", "content": blocks})
+                else:
+                    anthropic_messages.append(
+                        {"role": "user", "content": message.content}
+                    )
             elif message.role == "assistant":
                 flush_tool_results()
                 pending_assistant.append({"type": "text", "text": message.content})
