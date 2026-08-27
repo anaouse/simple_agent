@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import MessageNode from '@/components/MessageNode'
+import ToolGroupNode from '@/components/ToolGroupNode'
 import type { ChatMessage } from '@/types'
 
 interface MessageAreaProps {
@@ -7,6 +8,10 @@ interface MessageAreaProps {
   toolsHidden: boolean
   completedMessageId: string | null
 }
+
+type Row =
+  | { type: 'message'; message: ChatMessage }
+  | { type: 'group'; messages: ChatMessage[] }
 
 export default function MessageArea({ messages, toolsHidden, completedMessageId }: MessageAreaProps) {
   const areaRef = useRef<HTMLElement | null>(null)
@@ -67,6 +72,21 @@ export default function MessageArea({ messages, toolsHidden, completedMessageId 
   }, [])
 
   const visibleMessages = toolsHidden ? messages.filter((message) => message.role !== 'tool') : messages
+
+  const rows: Row[] = []
+  for (const message of visibleMessages) {
+    if (message.role === 'tool') {
+      const last = rows[rows.length - 1]
+      if (last?.type === 'group') {
+        last.messages.push(message)
+      } else {
+        rows.push({ type: 'group', messages: [message] })
+      }
+    } else {
+      rows.push({ type: 'message', message })
+    }
+  }
+
   const lastCompletedMessage = completedMessageId
     ? visibleMessages.findLast((message) => message.id === completedMessageId || message.parentMessageId === completedMessageId)
     : undefined
@@ -74,11 +94,17 @@ export default function MessageArea({ messages, toolsHidden, completedMessageId 
   return (
     <main className="message-area" ref={areaRef}>
       {visibleMessages.length === 0 && <p className="message-area__empty">发送一条消息开始聊天</p>}
-      {visibleMessages.map((message) => (
+      {rows.map((row) => row.type === 'message' ? (
         <MessageNode
-          key={message.id}
-          message={message}
-          expandSignal={message.id === lastCompletedMessage?.id ? completedMessageId : null}
+          key={row.message.id}
+          message={row.message}
+          expandSignal={row.message.id === lastCompletedMessage?.id ? completedMessageId : null}
+        />
+      ) : (
+        <ToolGroupNode
+          key={row.messages[0].id}
+          messages={row.messages}
+          expandSignal={row.messages.some((message) => message.id === lastCompletedMessage?.id) ? completedMessageId : null}
         />
       ))}
     </main>
