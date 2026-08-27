@@ -1,4 +1,5 @@
 import os
+import re
 import shlex
 import subprocess
 import time
@@ -10,7 +11,9 @@ BASH_PATH = r"D:\Git\Git\usr\bin\bash.exe"
 
 def _validate_command(command: str) -> str | None:
     """Reject commands that operate on .git folders or use rm."""
-    if ".git" in command:
+    # 只把 .git 当作目录名/路径组成部分匹配（后面跟非单词字符），
+    # 避免误伤 .gitignore、.gitattributes 等文件名
+    if re.search(r"(^|[/\s'\"`])\.git(?![A-Za-z0-9_])", command):
         return "Error: 任何命令都不能作用于 git 文件夹"
     try:
         tokens = shlex.split(command)
