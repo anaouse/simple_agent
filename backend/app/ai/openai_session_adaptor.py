@@ -2,7 +2,7 @@ import json
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from app.models import ChatMessage, TextChatMessage, ToolChatMessage
+from app.models import Attachment, ChatMessage, TextChatMessage, ToolChatMessage
 
 
 class OpenAISessionAdaptor:
@@ -35,7 +35,9 @@ class OpenAISessionAdaptor:
             if message.role == "user":
                 flush_assistant()
                 flush_tool_results()
-                openai_messages.append({"role": "user", "content": message.content})
+                openai_messages.append(
+                    OpenAISessionAdaptor.build_user_message(message.content, message.attachments)
+                )
             elif message.role == "assistant":
                 flush_tool_results()
                 assistant_content += message.content
@@ -63,6 +65,26 @@ class OpenAISessionAdaptor:
         flush_assistant()
         flush_tool_results()
         return openai_messages
+
+    @staticmethod
+    def build_user_message(
+        content: str, attachments: list[Attachment] | None
+    ) -> dict[str, object]:
+        if not attachments:
+            return {"role": "user", "content": content}
+        parts: list[dict[str, object]] = []
+        if content:
+            parts.append({"type": "text", "text": content})
+        for attachment in attachments:
+            parts.append(
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{attachment.media_type};base64,{attachment.data}"
+                    },
+                }
+            )
+        return {"role": "user", "content": parts}
 
     @staticmethod
     def from_openai(messages: list[dict[str, object]]) -> list[ChatMessage]:

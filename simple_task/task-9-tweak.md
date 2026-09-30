@@ -18,3 +18,7 @@ status: todo # done | todo
 - 用 `uv run --no-sync` 对改动的三个 Python 文件做语法解析，结果通过；未做运行时测试。
 - 查看后发现当前仍有 `read/write/edit/walk/bash` 五个工具。`web_fetch` 独占使用的 `requests`、`trafilatura` 依赖目前仍留在 `pyproject.toml` 和锁文件；用户确认不用清理。`readability-lxml` 也未在应用代码中直接引用。除此之外，两个 Agent 的项目提示词与错误识别逻辑有重复，但本次不做与请求无关的重构。
 - 后续反馈：`walk` 原先直接隐藏 `.git`、`.venv` 等目录，容易误以为不存在。现改为展示点开头目录及其他常见噪声目录的名称，但不递归展示内部；点开头的文件仍按原行为不展示。工具说明已注明可用 `ls` 等命令查看点开头目录内部。对修改文件做了语法解析，通过；未做运行时测试。
+
+# 验收
+
+walk和web_fetch相关改动成功

@@ -8,7 +8,7 @@ from openai import AsyncOpenAI
 
 from app.ai.openai_session_adaptor import OpenAISessionAdaptor
 from app.config import AgentConfig, ModelConfig
-from app.models import ChatMessage
+from app.models import Attachment, ChatMessage
 from app.tools import bash, edit, read, walk, write
 from app.tools.security import set_project_root
 
@@ -77,13 +77,13 @@ class OpenAIAgent:
         self._messages = OpenAISessionAdaptor.to_openai(messages)
 
     async def reply(
-        self, user_content: str, attachments: list[object] | None = None
+        self, user_content: str, attachments: list[Attachment] | None = None
     ) -> AsyncIterator["AgentEvent"]:
         """Generate a reply to the user message, yielding events as they occur."""
-        if attachments:
-            raise ValueError("OpenAI 图片支持暂未实现")
         set_project_root(self._project_path)
-        self._messages.append({"role": "user", "content": user_content})
+        self._messages.append(
+            OpenAISessionAdaptor.build_user_message(user_content, attachments)
+        )
 
         try:
             while True:
