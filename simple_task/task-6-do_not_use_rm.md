@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-16T10:21:13+08:00
-status: todo # done | todo
+status: done # done | todo
 ---
 
 > 你负责记录实现过程，人负责验收，记录最新状况与后续计划、修改status

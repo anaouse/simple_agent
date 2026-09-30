@@ -12,6 +12,6 @@ streamdown 强制依赖 tailwind css，但是其他部分可以自己写css
 
 token计算？有没有必要？还是前端简单计算所有节点的chars数量即可
 
-terra使用edit工具老是报错
+terra使用edit工具老是报错：是因为不符合它训练时候的工具样子
 
 要彻底重启网页才可以更新，服了。
