@@ -9,6 +9,7 @@ dependencies = [
     "fastapi>=0.139.2",
     "loguru>=0.7.3",
     "openai>=2.46.0",
+    "pillow>=12.3.0",
     "pydantic-settings>=2.13.1",
     "readability-lxml>=0.8.4.1",
     "requests>=2.34.2",

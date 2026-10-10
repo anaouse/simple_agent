@@ -9,7 +9,7 @@ from openai import AsyncOpenAI
 from app.ai.openai_session_adaptor import OpenAISessionAdaptor
 from app.config import AgentConfig, ModelConfig
 from app.models import Attachment, ChatMessage
-from app.tools import bash, edit, read, walk, write
+from app.tools import bash, edit, read, read_picture, walk, write
 from app.tools.security import set_project_root
 
 
@@ -66,6 +66,7 @@ class OpenAIAgent:
         self._tools = self._build_openai_tools()
         self._tool_functions: dict[str, Callable[..., str]] = {
             "read": read,
+            "read_picture": read_picture,
             "write": write,
             "edit": edit,
             "walk": walk,
@@ -204,6 +205,7 @@ class OpenAIAgent:
         self, tool_calls_data: dict[int, dict[str, object]]
     ) -> AsyncIterator["AgentEvent | InternalToolResultEvent"]:
         """Execute tool calls and yield events."""
+        image_messages: list[dict[str, object]] = []
         for index in sorted(tool_calls_data.keys()):
             tool_call = tool_calls_data[index]
             tool_id = str(tool_call.get("id", ""))
@@ -266,15 +268,17 @@ class OpenAIAgent:
                 "is_error": is_error,
             }
 
-            # Add tool result to messages
-            yield {
-                "type": "tool_result_internal",
-                "message": {
-                    "role": "tool",
-                    "tool_call_id": tool_id,
-                    "content": str(result),
-                },
-            }
+            # OpenAI tool results are text; send images in a following user message.
+            tool_message, image_message = OpenAISessionAdaptor.build_tool_result(
+                tool_id, tool_name, str(result), is_error
+            )
+            yield {"type": "tool_result_internal", "message": tool_message}
+            if image_message is not None:
+                image_messages.append(image_message)
+
+        # All tool responses must precede the image user messages.
+        for image_message in image_messages:
+            yield {"type": "tool_result_internal", "message": image_message}
 
     @staticmethod
     def _is_tool_error(result: str) -> bool:
@@ -357,7 +361,7 @@ class OpenAIAgent:
         from app.tools.tool_utils import tools_from_functions
 
         anthropic_tools, _ = tools_from_functions(
-            [read, write, edit, walk, bash]
+            [read, read_picture, write, edit, walk, bash]
         )
 
         # Convert Anthropic tool schema to OpenAI function calling schema

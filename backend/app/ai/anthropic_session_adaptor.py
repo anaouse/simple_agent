@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from app.models import ChatMessage, TextChatMessage, ToolChatMessage
+from app.tools.read_picture import picture_result
 
 
 class AnthropicSessionAdaptor:
@@ -65,17 +66,37 @@ class AnthropicSessionAdaptor:
                 )
                 flush_assistant()
                 pending_tool_results.append(
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": message.id,
-                        "content": message.result,
-                        "is_error": message.status == "error",
-                    }
+                    AnthropicSessionAdaptor.build_tool_result(
+                        message.id, message.tool_name, message.result, message.status == "error"
+                    )
                 )
 
         flush_assistant()
         flush_tool_results()
         return anthropic_messages
+
+    @staticmethod
+    def build_tool_result(
+        tool_id: str, tool_name: str, result: str, is_error: bool = False
+    ) -> dict[str, object]:
+        image = picture_result(tool_name, result, is_error)
+        content: str | list[dict[str, object]] = result
+        if image is not None:
+            content = [
+                {"type": "text", "text": f"Image read from: {image.get('path', '')}"},
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": image["media_type"],
+                        "data": image["data"],
+                    },
+                },
+            ]
+        return {
+            "type": "tool_result", "tool_use_id": tool_id,
+            "content": content, "is_error": is_error,
+        }
 
     @staticmethod
     def from_anthropic(messages: list[dict[str, object]]) -> list[ChatMessage]:

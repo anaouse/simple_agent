@@ -9,7 +9,7 @@ from loguru import logger
 from app.ai.anthropic_session_adaptor import AnthropicSessionAdaptor
 from app.config import AgentConfig, ModelConfig
 from app.models import Attachment, ChatMessage
-from app.tools import bash, edit, read, walk, write
+from app.tools import bash, edit, read, read_picture, walk, write
 from app.tools.security import set_project_root
 from app.tools.tool_utils import tools_from_functions
 
@@ -65,7 +65,7 @@ class AnthropicAgent:
         base_prompt = self._read_system_prompt(config.system_prompt_path)
         self._system_prompt = self._build_system_prompt(base_prompt)
         self._tools, self._tool_functions = tools_from_functions(
-            [read, write, edit, walk, bash]
+            [read, read_picture, write, edit, walk, bash]
         )
 
     def load_session(self, messages: list[ChatMessage]) -> None:
@@ -254,12 +254,9 @@ class AnthropicAgent:
                 "is_error": is_error,
             }
             result_blocks.append(
-                {
-                    "type": "tool_result",
-                    "tool_use_id": tool_use_id,
-                    "content": str(result),
-                    "is_error": is_error,
-                }
+                AnthropicSessionAdaptor.build_tool_result(
+                    tool_use_id, tool_name, str(result), is_error
+                )
             )
 
         yield {

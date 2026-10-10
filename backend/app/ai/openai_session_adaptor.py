@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from app.models import Attachment, ChatMessage, TextChatMessage, ToolChatMessage
+from app.tools.read_picture import picture_result
 
 
 class OpenAISessionAdaptor:
@@ -12,6 +13,7 @@ class OpenAISessionAdaptor:
         openai_messages: list[dict[str, object]] = []
         pending_tool_calls: list[dict[str, object]] = []
         pending_tool_results: list[dict[str, object]] = []
+        pending_image_messages: list[dict[str, object]] = []
         assistant_content = ""
 
         def flush_assistant() -> None:
@@ -30,6 +32,9 @@ class OpenAISessionAdaptor:
             if pending_tool_results:
                 openai_messages.extend(pending_tool_results)
                 pending_tool_results.clear()
+            if pending_image_messages:
+                openai_messages.extend(pending_image_messages)
+                pending_image_messages.clear()
 
         for message in messages:
             if message.role == "user":
@@ -54,17 +59,34 @@ class OpenAISessionAdaptor:
                     }
                 )
                 flush_assistant()
-                pending_tool_results.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": message.id,
-                        "content": message.result,
-                    }
+                tool_message, image_message = OpenAISessionAdaptor.build_tool_result(
+                    message.id, message.tool_name, message.result, message.status == "error"
                 )
+                pending_tool_results.append(tool_message)
+                if image_message is not None:
+                    pending_image_messages.append(image_message)
 
         flush_assistant()
         flush_tool_results()
         return openai_messages
+
+    @staticmethod
+    def build_tool_result(
+        tool_id: str, tool_name: str, result: str, is_error: bool = False
+    ) -> tuple[dict[str, object], dict[str, object] | None]:
+        image = picture_result(tool_name, result, is_error)
+        tool_message: dict[str, object] = {
+            "role": "tool", "tool_call_id": tool_id, "content": result,
+        }
+        if image is None:
+            return tool_message, None
+        description = f"Image read by read_picture (tool call {tool_id}): {image.get('path', '')}"
+        tool_message["content"] = description + "; image content follows."
+        image_message = OpenAISessionAdaptor.build_user_message(
+            description,
+            [Attachment(media_type=image["media_type"], data=image["data"])],
+        )
+        return tool_message, image_message
 
     @staticmethod
     def build_user_message(
