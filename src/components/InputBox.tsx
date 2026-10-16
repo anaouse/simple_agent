@@ -1,17 +1,20 @@
 import { ChangeEvent, ClipboardEvent, forwardRef, FormEvent, KeyboardEvent, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import Attachments from '@/components/Attachments'
-import type { Attachment, ModelSummary, ProjectFileEntry, SkillEntry } from '@/types'
+import type { Attachment, ModelSummary, Project, ProjectFileEntry, SkillEntry } from '@/types'
 
 interface InputBoxProps {
-  disabled: boolean
+  chatDisabled: boolean
+  editorDisabled: boolean
   error: string | null
   files: ProjectFileEntry[]
   models: ModelSummary[]
+  projects: Project[]
   skills: SkillEntry[]
   newSessionDisabled: boolean
   waiting: boolean
   onModelSelect: (modelName: string) => void
   onNewSession: () => void
+  onProjectOpen: (path: string) => void
   onSend: (content: string, attachments: Attachment[]) => void
   onStop: () => void
 }
@@ -37,15 +40,18 @@ export interface InputBoxHandle {
 }
 
 const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox({
-  disabled,
+  chatDisabled,
+  editorDisabled,
   error,
   files,
   models,
+  projects,
   skills,
   newSessionDisabled,
   waiting,
   onModelSelect,
   onNewSession,
+  onProjectOpen,
   onSend,
   onStop,
 }, ref) {
@@ -55,11 +61,17 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox({
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const activeSuggestionRef = useRef<HTMLButtonElement>(null)
-  const atQuery = findAtQuery(content, cursor)
+  const atQuery = findTriggerQuery(content, cursor, '@')
+  const projectQuery = findTriggerQuery(content, cursor, '#')
   const slashQuery = findSlashQuery(content, cursor)
   const modelQuery = findCommandQuery(content, cursor, 'model')
   const skillQuery = findCommandQuery(content, cursor, 'skill')
   const suggestions = buildSuggestions()
+  const trimmedContent = content.trim()
+  const projectCommand = trimmedContent.startsWith('#')
+  const canSubmit = projectCommand
+    ? trimmedContent.length > 1
+    : !chatDisabled && (trimmedContent.length > 0 || attachments.length > 0)
 
   useEffect(() => {
     activeSuggestionRef.current?.scrollIntoView({ block: 'nearest' })
@@ -67,7 +79,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox({
 
   useImperativeHandle(ref, () => ({
     focus() {
-      if (disabled) return false
+      if (editorDisabled) return false
       requestAnimationFrame(() => textareaRef.current?.focus())
       return true
     },
@@ -84,7 +96,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox({
         autoGrow(element)
       })
     },
-  }), [disabled])
+  }), [editorDisabled])
 
   function buildSuggestions(): Suggestion[] {
     if (atQuery) {
@@ -93,6 +105,14 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox({
         icon: entry.isDirectory ? '📁' : '📄',
         label: entry.path,
         onSelect: () => replaceQuery(atQuery, `@${entry.absolutePath} `),
+      }))
+    }
+    if (projectQuery) {
+      return filterProjects(projects, projectQuery.query).map((project) => ({
+        key: `project:${project.path}`,
+        icon: '📁',
+        label: project.path,
+        onSelect: () => replaceQuery(projectQuery, `#${project.path} `),
       }))
     }
     if (modelQuery) {
@@ -133,7 +153,15 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox({
   function send() {
     const value = content.trim()
     const hasAttachments = attachments.length > 0
-    if ((!value && !hasAttachments) || disabled) return
+    if (editorDisabled) return
+    if (value.startsWith('#')) {
+      const path = value.slice(1).trim()
+      if (!path) return
+      onProjectOpen(path)
+      clearInput()
+      return
+    }
+    if ((!value && !hasAttachments) || chatDisabled) return
     if (!hasAttachments) {
       if (value === '/model' || value === '/skill') return
       if (value.startsWith('/model ')) {
@@ -289,13 +317,13 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox({
         )}
         <textarea
           aria-label="消息"
-          disabled={disabled}
+          disabled={editorDisabled}
           onChange={handleChange}
           onClick={syncCursor}
           onKeyDown={handleKeyDown}
           onKeyUp={handleKeyUp}
           onPaste={handlePaste}
-          placeholder="输入消息，使用 @ 引用文件或 / 执行命令…"
+          placeholder="输入消息，使用 @ 引用文件、/ 执行命令或 # 切换项目…"
           ref={textareaRef}
           rows={1}
           value={content}
@@ -306,7 +334,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox({
           停止
         </button>
       ) : (
-        <button disabled={disabled || (!content.trim() && attachments.length === 0)} type="submit">
+        <button disabled={editorDisabled || !canSubmit} type="submit">
           发送
         </button>
       )}
@@ -316,9 +344,9 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox({
 
 export default InputBox
 
-function findAtQuery(content: string, cursor: number): TextQuery | null {
+function findTriggerQuery(content: string, cursor: number, trigger: string): TextQuery | null {
   const beforeCursor = content.slice(0, cursor)
-  const start = beforeCursor.lastIndexOf('@')
+  const start = beforeCursor.lastIndexOf(trigger)
   if (start < 0) return null
   const query = beforeCursor.slice(start + 1)
   if (/\s/.test(query)) return null
@@ -336,6 +364,19 @@ function findCommandQuery(content: string, cursor: number, command: string): Tex
   const match = beforeCursor.match(new RegExp(`^/${command}\\s+(.*)$`, 'i'))
   if (!match) return null
   return { start: 0, end: cursor, query: match[1].trim().toLowerCase() }
+}
+
+function filterProjects(projects: Project[], query: string): Project[] {
+  return projects
+    .filter((project) => !query || project.path.toLowerCase().includes(query))
+    .sort((left, right) => {
+      const leftPath = left.path.toLowerCase()
+      const rightPath = right.path.toLowerCase()
+      const leftScore = !query || leftPath === query ? 0 : leftPath.startsWith(query) ? 1 : 2
+      const rightScore = !query || rightPath === query ? 0 : rightPath.startsWith(query) ? 1 : 2
+      return leftScore - rightScore || left.path.length - right.path.length || leftPath.localeCompare(rightPath)
+    })
+    .slice(0, MAX_RESULTS)
 }
 
 function filterFiles(files: ProjectFileEntry[], query: string): ProjectFileEntry[] {

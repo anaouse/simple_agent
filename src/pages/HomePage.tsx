@@ -6,6 +6,7 @@ import ProjectSidebar from '@/components/ProjectSidebar'
 import SessionInfo from '@/components/SessionInfo'
 import type {
   Attachment,
+  ApiErrorResponse,
   ChatMessage,
   ClientMessage,
   ModelSummary,
@@ -221,6 +222,27 @@ export default function HomePage() {
     ))
   }
 
+  async function openProject(path: string) {
+    const existing = projects.find((project) => project.path === path)
+    if (existing) {
+      setInputError(null)
+      await selectProject(existing.path)
+      return
+    }
+    try {
+      const response = await axios.post<Project>(`${API_BASE_URL}/projects`, { path })
+      setInputError(null)
+      addProject(response.data)
+      await selectProject(response.data.path)
+    } catch (requestError) {
+      if (axios.isAxiosError<ApiErrorResponse>(requestError)) {
+        setInputError(requestError.response?.data.error.message ?? '无法连接后端')
+      } else {
+        setInputError('创建项目失败')
+      }
+    }
+  }
+
   function removeProject(path: string) {
     setProjects((current) => current.filter((project) => project.path !== path))
     if (path === activePath) {
@@ -417,7 +439,7 @@ export default function HomePage() {
     <div className="app-shell">
       <div className="home-page">
         <header className="home-page__header">
-          <strong>{activePath ?? '请在侧边栏创建或选择一个项目'}</strong>
+          <strong>{activePath ?? '输入 # 项目路径来添加或切换项目'}</strong>
           <span>{activePath ? (connected ? '已连接' : '连接中…') : '未选择项目'}</span>
         </header>
         <MessageArea
@@ -433,16 +455,19 @@ export default function HomePage() {
           onToolsHiddenChange={setToolsHidden}
         />
         <InputBox
-          disabled={!activePath || !connected || responding || startingSession}
+          chatDisabled={!activePath || !connected}
+          editorDisabled={responding || startingSession}
           error={inputError}
           ref={inputBoxRef}
           files={projectFiles}
           models={models}
+          projects={projects}
           skills={skills}
           newSessionDisabled={!activePath || startingSession}
           waiting={responding}
           onModelSelect={selectModel}
           onNewSession={startNewSession}
+          onProjectOpen={openProject}
           onSend={send}
           onStop={stop}
         />
@@ -451,7 +476,6 @@ export default function HomePage() {
         activePath={activePath}
         activeSessionFile={activeSessionFile}
         collapsed={sidebarCollapsed}
-        onAdd={addProject}
         onRemove={removeProject}
         onSelect={selectProject}
         onSelectSession={selectSession}

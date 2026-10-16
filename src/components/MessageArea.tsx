@@ -93,7 +93,6 @@ export default function MessageArea({ messages, toolsHidden, completedMessageId 
 
   return (
     <main className="message-area" ref={areaRef}>
-      {visibleMessages.length === 0 && <p className="message-area__empty">发送一条消息开始聊天</p>}
       {rows.map((row) => row.type === 'message' ? (
         <MessageNode
           key={row.message.id}
