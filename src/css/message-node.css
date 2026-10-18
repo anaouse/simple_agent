@@ -89,19 +89,162 @@
 }
 
 .message-node__content {
-  padding: 0 14px 14px;
+  padding: 0 18px 18px;
   color: var(--color-text-secondary);
+  font-family: -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif;
   font-size: 15px;
-  line-height: 1.65;
-  overflow-wrap: anywhere;
+  line-height: 1.8;
+  letter-spacing: 0.01em;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+/* 助手回答：限制行宽，长文更好读 */
+.message-node--assistant .message-node__content {
+  max-width: 880px;
+}
+
+.message-node__content > :first-child,
+.message-node__content > div > :first-child {
+  margin-top: 0;
+}
+
+.message-node__content > :last-child,
+.message-node__content > div > :last-child {
+  margin-bottom: 0;
 }
 
 .message-node__content p {
-  margin: 0;
+  margin: 0.85em 0;
+}
+
+.message-node__content h1,
+.message-node__content h2,
+.message-node__content h3,
+.message-node__content h4,
+.message-node__content h5,
+.message-node__content h6 {
+  margin: 1.7em 0 0.7em;
+  color: var(--color-text);
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: 0;
+}
+
+.message-node__content h1 {
+  font-size: 1.45em;
+}
+
+.message-node__content h2 {
+  font-size: 1.2em;
+}
+
+.message-node__content h3 {
+  font-size: 1.05em;
+}
+
+.message-node__content h4,
+.message-node__content h5,
+.message-node__content h6 {
+  font-size: 1em;
+}
+
+.message-node__content strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.message-node__content ul,
+.message-node__content ol {
+  margin: 0.85em 0;
+  padding-left: 1.7em;
+  list-style-position: outside;
+}
+
+.message-node__content ul {
+  list-style-type: disc;
+}
+
+.message-node__content ol {
+  list-style-type: decimal;
+}
+
+.message-node__content li {
+  margin: 0.35em 0;
+  padding-left: 0;
+}
+
+.message-node__content li > p {
+  margin: 0.35em 0;
+}
+
+.message-node__content li::marker {
+  color: var(--color-text-muted);
+}
+
+.message-node__content blockquote {
+  margin: 1.1em 0;
+  padding: 0.1em 0 0.1em 1em;
+  border-left: 3px solid var(--color-border-strong);
+  color: var(--color-text-muted);
+}
+
+.message-node__content hr {
+  margin: 1.8em 0;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.message-node__content a {
+  color: var(--message-user-accent);
+  text-decoration: underline;
+  text-decoration-color: var(--color-border-strong);
+  text-underline-offset: 0.2em;
+}
+
+.message-node__content a:hover {
+  text-decoration-color: currentColor;
+}
+
+.message-node__content :not(pre) > code {
+  padding: 0.12em 0.36em;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.875em;
 }
 
 .message-node__content pre {
   overflow-x: auto;
+}
+
+.message-node__content table {
+  width: 100%;
+  margin: 1.1em 0;
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+
+.message-node__content th,
+.message-node__content td {
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.message-node__content th {
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.message-node__content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
 }
 
 .message-node__error {
