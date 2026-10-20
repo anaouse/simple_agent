@@ -1,5 +1,5 @@
 .message-area {
   min-height: 0;
   overflow-y: auto;
-  padding: 20px 20px 35vh;
+  padding: 0 0 35vh;
 }

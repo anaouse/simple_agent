@@ -438,16 +438,14 @@ export default function HomePage() {
   return (
     <div className="app-shell">
       <div className="home-page">
-        <header className="home-page__header">
-          <strong>{activePath ?? '输入 # 项目路径来添加或切换项目'}</strong>
-          <span>{activePath ? (connected ? '已连接' : '连接中…') : '未选择项目'}</span>
-        </header>
         <MessageArea
           messages={messages}
           toolsHidden={toolsHidden}
           completedMessageId={completedMessageId}
         />
         <SessionInfo
+          projectPath={activePath}
+          connected={connected}
           modelName={activeModelName}
           responding={responding}
           totalToken={totalToken}

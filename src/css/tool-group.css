@@ -1,21 +1,19 @@
+/* 消息区顶层的工具调用分组：列表式平铺，占满宽度、与相邻行无空隙 */
 .tool-group {
-  margin-bottom: 12px;
-  border: 1px solid var(--message-tool-border);
-  border-radius: 10px;
+  border-bottom: 1px solid var(--color-border);
   background: var(--message-tool-background);
 }
 
 .tool-group__header {
   display: flex;
   align-items: center;
-  padding: 12px 14px;
+  padding: 12px 20px;
 }
 
 .tool-group--expanded .tool-group__header {
   position: sticky;
-  top: -20px;
+  top: 0;
   z-index: 1;
-  border-radius: 9px 9px 0 0;
   background: inherit;
 }
 
@@ -66,9 +64,10 @@
 }
 
 .tool-group__body {
-  padding: 0 14px 14px;
+  padding: 0 20px 16px;
 }
 
+/* 展开后的内部工具条目继续使用卡片样式，间隔 12px、最后一条不留边距 */
 .tool-group__body .message-node {
   margin-bottom: 12px;
 }

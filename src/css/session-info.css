@@ -11,6 +11,13 @@
   font-size: 12px;
 }
 
+.session-info__group {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
 .session-info strong {
   min-width: 0;
   overflow: hidden;
@@ -20,7 +27,17 @@
   white-space: nowrap;
 }
 
+.session-info__project {
+  flex: none;
+  max-width: 260px;
+}
+
+.session-info__connection {
+  flex: none;
+}
+
 .session-info__tools-toggle {
+  flex: none;
   padding: 3px 8px;
   border: 1px solid var(--color-border-strong);
   border-radius: 4px;

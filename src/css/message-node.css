@@ -24,10 +24,30 @@
 
 .message-node--expanded .message-node__header {
   position: sticky;
-  top: -20px;
+  top: 0;
   z-index: 1;
   border-radius: 9px 9px 0 0;
   background: inherit;
+}
+
+/* 消息区顶层消息：列表式平铺，占满宽度、行间无空隙，仅用分隔线区分 */
+.message-area > .message-node {
+  margin-bottom: 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+}
+
+.message-area > .message-node > .message-node__header {
+  padding: 12px 20px;
+}
+
+.message-area > .message-node.message-node--expanded > .message-node__header {
+  border-radius: 0;
+}
+
+.message-area > .message-node > .message-node__content {
+  padding: 0 20px 18px;
 }
 
 .message-node__header-toggle {
